@@ -6,16 +6,6 @@ from lxml import etree
 import urllib, sys, re
 import xml.etree.ElementTree as ET
 
-try:
-    # for beautifulsoup v4
-    import bs4
-    sys.modules['BeautifulSoup'] = bs4
-except ImportError:
-    # for beautifulsoup v3
-    import BeautifulSoup
-    sys.modules['BeautifulSoup'] = BeautifulSoup
-
-
 class WebsiteDataExtractor(object):
     DOMAIN = "domain"
     TITLE = "title"
