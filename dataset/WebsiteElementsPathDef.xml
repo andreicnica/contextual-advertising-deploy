@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+
+<elementPathsDefinitions>
+    <default>
+        <title>/head/title/text()</title>
+        <description>//*[@class="description"]</description>
+    </default>
+    <website>
+        <domain>http://www.generation-nt.com/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>//p[@class="resume"]//text()</summary>
+        <mainText>//div[@class="textzone"]/node()</mainText>
+        <hyperlinks>//div[@class="textzone"]//a//text()</hyperlinks>
+        <imageCaption>//div[@class="textzone"]//img/@alt|//div[@class="description"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://www.maison.com/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>//article//p[@itemprop="description"]//text()</summary>
+        <mainText>//div[@itemprop="articleBody"]/node()</mainText>
+        <hyperlinks>//div[@itemprop="articleBody"]//a//text()</hyperlinks>
+        <imageCaption>//div[@itemprop="articleBody"]//img/@alt|//div[@class="intro"]//img/@alt</imageCaption>
+    </website>
+</elementPathsDefinitions>
