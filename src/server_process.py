@@ -19,7 +19,7 @@ from keyterm_extractor import KeyTermExtractor
 from keyterm_features import KeyTermFeatures
 from relevance_filter import RelevanceFilter
 import utils.functions as utils
-import urlparse
+import urlparse, json, pprint
 
 
 #Handler for http server reques
@@ -28,7 +28,7 @@ class ServerHandlerClass(BaseHTTPRequestHandler):
 
     def _set_headers(self):
         self.send_response(200)
-        self.send_header('Content-type', 'text/html')
+        self.send_header('Content-type', 'application/json')
         self.end_headers()
 
     def do_GET(self):
@@ -39,7 +39,8 @@ class ServerHandlerClass(BaseHTTPRequestHandler):
         self._set_headers()
 
         #send a page containing the list of terms
-        self.wfile.write("<html><body><h1>%s</h1></body></html>" % terms)
+        #self.wfile.write("<html><body><h1>%s</h1></body></html>" % terms)
+        self.wfile.write(json.dumps(terms))
 
     def do_HEAD(self):
         self._set_headers()
@@ -54,7 +55,7 @@ class ServerHandlerClass(BaseHTTPRequestHandler):
 
         self._set_headers()
         #send a list of terms
-        self.wfile.write(terms)
+        self.wfile.write(json.dumps(terms))
 
     def extractTermsFromLink(self, link):
         terms = []
@@ -80,6 +81,7 @@ class KeytermServerExtractor(object):
         ## 1) Extract webpage data
         # print "[INFO] ==== Extracting webpage data ===="
         data_dict = self.data_extractor.crawlPage(link)
+        pprint.pprint(data_dict)
 
         ## 2) Extract candidate keyterms
         # print "[INFO] ==== Extracting candidate keyterms ===="
