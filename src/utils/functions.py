@@ -1,6 +1,4 @@
-import string, re, nltk, json
-import pattern.text.en as ptrn_en
-import pattern.text.fr as ptrn_fr
+import string, re, nltk
 from nltk.corpus import stopwords
 
 

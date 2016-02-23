@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 
 class RelevanceFilter(object):
     def __init__(self, keyterm_feature_df, saved_classifier_file, topk = 10):

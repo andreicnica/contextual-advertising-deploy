@@ -15,8 +15,6 @@ except ImportError:
     import BeautifulSoup
     sys.modules['BeautifulSoup'] = BeautifulSoup
 
-from lxml.html.soupparser import fromstring
-
 
 class WebsiteDataExtractor(object):
     DOMAIN = "domain"
