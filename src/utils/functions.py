@@ -1,18 +1,29 @@
 import string, re, nltk
-from nltk.corpus import stopwords
-
 
 ## GENERAL CONSTANTS
 LANG_EN = "english"
 LANG_FR = "french"
+LANG_ES = "spanish"
+LANG_PT = "portuguese"
+LANG_IT = "italian"
+LANG_DE = "german"
+
+LANG_ABREV = {
+    LANG_EN : "en",
+    LANG_FR : "fr",
+    LANG_ES : "es",
+    LANG_PT : "pt",
+    LANG_IT : "it",
+    LANG_DE : "de"
+}
+
+
+
 import numpy as np
 import pandas as pd
 
 word_split_regex = re.compile(r'[%s\s]+' % re.escape(string.punctuation))
 punctuation_regex = re.compile(r"[^\w]+", flags=re.UNICODE)
-
-stopwords_en = set(stopwords.words(LANG_EN))
-stopwords_fr = set(stopwords.words(LANG_FR))
 
 
 def mytokenize(text, lang = LANG_EN):
@@ -22,15 +33,6 @@ def mytokenize(text, lang = LANG_EN):
 
     sentences = nltk.sent_tokenize(text, language = lang)
     return [w for s in sentences for w in punctuation_regex.sub(" ", s).split()]
-
-def generate_ngrams(text, size):
-    """
-    :param text: Unicode string or list of words
-    :param size: Maximum size of n-gram window
-    :return: Generate n-grams of length <= `size' starting from the input text.
-        The function returns a list of word list, where each word list represents a n-gram instance.
-    """
-    pass
 
 
 def remove_stopwords(text, lang=LANG_EN):
@@ -59,20 +61,6 @@ def remove_stopwords(text, lang=LANG_EN):
         return []
 
 
-def apply_pos_tag(text, lang=LANG_EN):
-    """
-    :param text: Single word or sentence
-    :param lang: language for which to apply POS-tagging
-    :return: A list of tuples of the (word,tag) pairs
-    """
-    if lang == LANG_FR:
-        from pattern.text.fr import tag
-    else:
-        from pattern.text.en import tag
-
-    return tag(text)
-
-
 def split_into_words(text):
     """
     :param text: Sentence
@@ -90,7 +78,8 @@ def clean_string(text):
     text.strip()
     return text
 
-class TextualFeatureExtractor:
+
+class TextualFeatureExtractor(object):
     def __init__(self, df, urlTokenColum="linkTokens", titleColumn="title", descriptionColumn="resume", textzoneColumn="textZone", anchorColumn="anchors", imgDescColumn="alternateTxt"):
         self.df = df
 
@@ -240,8 +229,7 @@ class Term(object):
     # Information Retrieval Features
     CVAL    = "cvalue"
     TF      = "tf"
-    DF      = "df"
-    TFIDF   = "tfidf"
+    LEN     = "len"
 
     # Textual Features
     IS_TITLE = "isTitle"
@@ -256,54 +244,32 @@ class Term(object):
     IS_KEYWORD          = "isKeyword"
 
 
-    def __init__(self, term_str, doc, length = 1, lang = LANG_EN):
-        self._term_str = term_str
+    def __init__(self, term_info, doc, lang = LANG_EN):
+        self._term_info = term_info
         self.doc = doc
         self.lang = lang
-        self.length = length
 
-        self._stemmer = nltk.stem.snowball.EnglishStemmer()
-        if self.lang == LANG_FR:
-            self._stemmer = nltk.stem.snowball.FrenchStemmer()
+        self._prop_dict = {
+            Term.TF     : term_info['tf'],
+            Term.CVAL   : term_info['cvalue'],
+            Term.LEN    : term_info['len']
+        }
 
-        self._prop_dict = {}
-        self._transform(term_str)
 
-    def _transform(self, term):
-        if self.length == 1:
-            if not isinstance(term, basestring):
-                term = str(term).decode("utf-8")
-
-            self._term_split = term
-            self._term_rep = [self._stemmer.stem(term)]
-        else:
-            # 1) tokenize term
-            tokenized_term = mytokenize(term, self.lang)
-            #print "Tokenized:", tokenized_term
-
-            # 2) remove stopwords
-            clean_term = remove_stopwords(tokenized_term, self.lang)
-            #print "Clean:", clean_term
-
-            # 3) apply stemming
-            stemmed_term = [self._stemmer.stem(w) for w in clean_term]
-
-            self._term_split = term.split()
-            self._term_rep = stemmed_term
-            #print "Stemmed:", stemmed_term
 
     ## ================ Access term representations ================
     @property
     def original(self):
-        return self._term_str
+        return self._term_info['text']
 
     @property
-    def split(self):
-        return self._term_split
+    def words(self):
+        return self._term_info['words']
 
     @property
-    def transformed(self):
-        return self._term_rep
+    def lemmas(self):
+        return self._term_info['lemma']
+
 
     ## ================ Access Information Retrieval Features ================
     @property
@@ -315,29 +281,12 @@ class Term(object):
         self._prop_dict[Term.TF] = value
 
     @property
-    def df(self):
-        return self._prop_dict.get(Term.DF)
-
-    @df.setter
-    def df(self, value):
-        self._prop_dict[Term.DF] = value
-
-    @property
-    def tfidf(self):
-        return self._prop_dict.get(Term.TFIDF)
-
-    @tfidf.setter
-    def tfidf(self, value):
-        self._prop_dict[Term.TFIDF] = value
-
-
-    @property
     def cvalue(self):
         return self._prop_dict.get(Term.CVAL)
 
-    @cvalue.setter
-    def cvalue(self, value):
-        self._prop_dict[Term.CVAL] = value
+    @property
+    def term_len(self):
+        return self._prop_dict.get(Term.LEN)
 
     @property
     def is_keyword(self):
@@ -379,32 +328,34 @@ class Term(object):
     def is_description(self):
         return self._prop_dict.get(Term.IS_DESCRIPTION)
 
-    # @property
-    # def is_textzone(self):
-    #     return self._prop_dict.get(Term.IS_TEXTZONE)
-
     @property
     def doc_position(self):
         return self._prop_dict.get(Term.DOC_POSITION)
 
+
     ## ================ Compute Textual Features ================
     def extract_textual_features(self):
         if self.textual_feature_extractor is not None:
-            self._prop_dict[Term.IS_TITLE] = self.textual_feature_extractor.isTitle(self._term_split, self.doc.url)
-            self._prop_dict[Term.IS_URL] = self.textual_feature_extractor.isURL(self._term_split, self.doc.url)
-            self._prop_dict[Term.IS_DESCRIPTION] = self.textual_feature_extractor.isDescription(self._term_split, self.doc.url)
-            self._prop_dict[Term.IS_FIRST_PARAGRAPH] = self.textual_feature_extractor.isFirstParagraph(self._term_split, self.doc.url)
-            self._prop_dict[Term.IS_LAST_PARAGRAPH] = self.textual_feature_extractor.isLastParagraph(self._term_split, self.doc.url)
-            self._prop_dict[Term.IS_ANCHOR] = self.textual_feature_extractor.isAnchor(self._term_split, self.doc.url)
-            self._prop_dict[Term.IS_IMG_DESC] = self.textual_feature_extractor.isImgDesc(self._term_split, self.doc.url)
-            self._prop_dict[Term.DOC_POSITION] = self.textual_feature_extractor.posInDoc(self._term_split, self.doc.url)
+
+            self._prop_dict[Term.IS_TITLE] = self.textual_feature_extractor.isTitle(self.lemmas, self.doc.url)
+            self._prop_dict[Term.IS_URL] = self.textual_feature_extractor.isURL(self.lemmas, self.doc.url)
+
+            self._prop_dict[Term.IS_DESCRIPTION] = self.textual_feature_extractor.isDescription(self.lemmas, self.doc.url)
+
+            self._prop_dict[Term.IS_FIRST_PARAGRAPH] = self.textual_feature_extractor.isFirstParagraph(self.original, self.doc.url)
+            self._prop_dict[Term.IS_LAST_PARAGRAPH] = self.textual_feature_extractor.isLastParagraph(self.original, self.doc.url)
+
+            self._prop_dict[Term.IS_ANCHOR] = self.textual_feature_extractor.isAnchor(self.lemmas, self.doc.url)
+            self._prop_dict[Term.IS_IMG_DESC] = self.textual_feature_extractor.isImgDesc(self.lemmas, self.doc.url)
+
+            self._prop_dict[Term.DOC_POSITION] = self.textual_feature_extractor.posInDoc(self.original, self.doc.url)
 
             if self._prop_dict[Term.DOC_POSITION] is None:
                 self._prop_dict[Term. DOC_POSITION] = -1
 
     ## ================ String and Hashcode Functions ================
     def __str__(self):
-        return self._term_str
+        return self._term_info['']
 
     def __unicode__(self):
         return unicode(self._term_str)
@@ -421,59 +372,15 @@ class Term(object):
 
 
 class Document(object):
-    def __init__(self, url, text, lang = LANG_EN):
+    def __init__(self, url, lang = LANG_EN):
         self.url = url
+        self.lang = lang
         self.relevant_terms = []
-
-        self._doc_text = text
-        self._lang = lang
-
-        self._doc_rep = self._transform(self._doc_text)
-
-
-    @staticmethod
-    def sublist_counter(list, sublist):
-        matches = 0
-
-        if sublist:
-            sublist_length = len(sublist)
-            for i in range(len(list) - sublist_length + 1):
-                if list[i] == sublist[0] and list[i:(i+sublist_length)] == sublist:
-                    matches += 1
-
-        return matches
-
-    def _transform(self, text):
-        # 1) tokenize term
-        tokenized_text = mytokenize(text, self._lang)
-
-        # 2) remove stopwords
-        clean_text = remove_stopwords(tokenized_text, self._lang)
-
-        # 3) apply stemming
-        stemmer = nltk.stem.snowball.EnglishStemmer()
-        if self._lang == LANG_FR:
-            stemmer = nltk.stem.snowball.FrenchStemmer()
-
-        stemmed_text = [stemmer.stem(w) for w in clean_text]
-        return stemmed_text
-
-    @property
-    def original(self):
-        return self._doc_text
-
-    @property
-    def transformed(self):
-        return self._doc_rep
 
 
     def load_relevant_terms(self, terms):
         self.relevant_terms = terms
 
-
-    def compute_tf(self):
-        for term in self.relevant_terms:
-            term.tf = max(1, Document.sublist_counter(self._doc_rep, term.transformed))
 
 
 
@@ -529,5 +436,3 @@ anc = anc.apply(lambda x: map(lambda y: y.replace("http://www.generation-nt.com/
 anc = anc.apply(lambda x: map(lambda y: re.sub(r"[-[0-9]*]*.html", "", y), x))
 anc = anc.apply(lambda x: map(lambda y: re.sub(r"[-_+\/]", " ", y), x))
 """
-
-

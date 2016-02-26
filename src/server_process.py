@@ -3,7 +3,7 @@
 """
 HTTP SERVER for running keyterm extractor.
 Usage::
-    ./server_process [<port>]
+    ./server_process [-port <port>] [-lang <lang>]
 Send a GET request::
     http://localhost:<port>/?link=<link>
 Send a POST request::
@@ -15,72 +15,99 @@ import SocketServer
 
 import sys
 from website_data_extractor import WebsiteDataExtractor
-from keyterm_extractor import KeyTermExtractor
+from keyterm_extractor import KeyTermExtractor, KeyTermExtractor2
 from keyterm_features import KeyTermFeatures
 from relevance_filter import RelevanceFilter
 import utils.functions as utils
 import urlparse, json, pprint
 
 
-#Handler for http server reques
-class ServerHandlerClass(BaseHTTPRequestHandler):
-    global keytermExtractor
+## Factory for ServerHandlerClass handling http server requests
+def makeServerHandlerClass(keytermExtractor):
 
-    def _set_headers(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.end_headers()
+    class ServerHandlerClass(BaseHTTPRequestHandler, object):
+        def __init__(self, *args, **kwargs):
+            self.keytermExtractor = keytermExtractor
+            super(ServerHandlerClass, self).__init__(*args, **kwargs)
 
-    def do_GET(self):
-        link = urlparse.parse_qs(urlparse.urlparse(self.path).query).get('link', None)
+        #global keytermExtractor
 
-        terms = self.extractTermsFromLink(link)
+        def _set_headers(self):
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
 
-        self._set_headers()
+        def do_GET(self):
+            link = urlparse.parse_qs(urlparse.urlparse(self.path).query).get('link', None)
 
-        #send a page containing the list of terms
-        #self.wfile.write("<html><body><h1>%s</h1></body></html>" % terms)
-        self.wfile.write(json.dumps(terms))
+            terms = self.extractTermsFromLink(link)
 
-    def do_HEAD(self):
-        self._set_headers()
+            self._set_headers()
 
-    def do_POST(self):
+            #send a page containing the list of terms
+            #self.wfile.write("<html><body><h1>%s</h1></body></html>" % terms)
+            self.wfile.write(json.dumps(terms))
 
-        content_len = int(self.headers.getheader('content-length', 0))
-        post_body = self.rfile.read(content_len)
-        link = urlparse.parse_qs(post_body).get('link', None)
+        def do_HEAD(self):
+            self._set_headers()
 
-        terms = self.extractTermsFromLink(link)
+        def do_POST(self):
 
-        self._set_headers()
-        #send a list of terms
-        self.wfile.write(json.dumps(terms))
+            content_len = int(self.headers.getheader('content-length', 0))
+            post_body = self.rfile.read(content_len)
+            link = urlparse.parse_qs(post_body).get('link', None)
 
-    def extractTermsFromLink(self, link):
-        terms = []
-        if link:
-            #Run extractor only on first link sent
-            terms = keytermExtractor.extracTermsFromLink(link[0])
-        return terms
+            terms = self.extractTermsFromLink(link)
+
+            self._set_headers()
+            #send a list of terms
+            self.wfile.write(json.dumps(terms))
+
+        def extractTermsFromLink(self, link):
+            terms = []
+            if link:
+                #Run extractor only on first link sent
+                terms = self.keytermExtractor.extracTermsFromLink(link[0])
+            return terms
+
+    return ServerHandlerClass
+
+
+## Factory class for ServerHandlerClass
+
 
 class KeytermServerExtractor(object):
-    data_extractor = WebsiteDataExtractor("dataset/WebsiteElementsPathDef.xml")
+    def __init__(self, port = 8080, lang = utils.LANG_FR):
+        print "Initializing Term Extractor Server"
 
-    def __init__(self):
-        print "INIT TERM EXtractor"
+        ## setup server port
+        self.port = port
 
-    def runServer(self, server_class=HTTPServer, handler_class=ServerHandlerClass, port=8080):
-        server_address = ('', port)
-        httpd = server_class(server_address, handler_class)
+        ## setup keyterm service extraction language
+        self.lang = lang
+
+        ## create and initialize extraction services
+        self.data_scraper = WebsiteDataExtractor("dataset/WebsiteElementsPathDef.xml")
+        self.candidate_extractor = KeyTermExtractor2(lang)
+        #self.feature_extractor =
+
+        ## setup http request handling classes
+        self.server_class = HTTPServer
+        self.handler_class = makeServerHandlerClass(self)
+
+
+    def runServer(self):
+        server_address = ('', self.port)
+        httpd = self.server_class(server_address, self.handler_class)
 
         print 'Starting httpd...'
         httpd.serve_forever()
 
+
     def extracTermsFromLink(self, link):
         ## 1) Extract webpage data
         # print "[INFO] ==== Extracting webpage data ===="
-        data_dict = self.data_extractor.crawlPage(link)
+        data_dict = self.data_scraper.crawlPage(link)
         pprint.pprint(data_dict)
 
         ## 2) Extract candidate keyterms
@@ -103,14 +130,17 @@ class KeytermServerExtractor(object):
         # print "[INFO] ==== FINAL SELECTION ====="
         return selected_keyterms
 
-#initial data
-keytermExtractor = KeytermServerExtractor()
-
 
 if __name__ == "__main__":
     from sys import argv
 
-    if len(argv) == 2:
-        keytermExtractor.runServer(port=int(argv[1]))
-    else:
-        keytermExtractor.runServer()
+    port = 8080
+    lang = "french"
+
+    if len(argv) == 3:
+        port = int(sys.argv[1])
+        lang = sys.argv[2]
+
+    # create keyterm extractor service
+    keytermExtractor = KeytermServerExtractor(port=port, lang=lang)
+    keytermExtractor.runServer()

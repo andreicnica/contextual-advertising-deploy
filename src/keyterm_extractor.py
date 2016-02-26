@@ -1,6 +1,11 @@
 __author__ = 'alex'
 
-import os, shutil, subprocess, codecs
+import os, shutil, subprocess, codecs, sys
+import treetaggerwrapper, csv
+import logging, pprint
+import nltk.data
+
+from utils.functions import LANG_ABREV
 from website_data_extractor import WebsiteDataExtractor
 
 
@@ -82,4 +87,205 @@ class KeyTermExtractor(object):
 
         print "Performing cleanup ..."
         # 4) cleanup
-        # self._cleanup()
+        self._cleanup()
+
+
+
+class KeyTermExtractor2(object):
+    EXTRACTOR_ROOT_DIR = "." + os.path.sep + "biotex-term-extraction"
+    TREETAGGER_DIR = EXTRACTOR_ROOT_DIR + os.path.sep + "TreeTagger"
+    POS_PATTERN_DIR = EXTRACTOR_ROOT_DIR + os.path.sep + "patterns"
+
+    @staticmethod
+    def convert(pos_pattern, base, tagset):
+            nr = 0
+            for tag in pos_pattern:
+                nr = nr * base + tagset[tag]
+
+            return nr
+
+    @staticmethod
+    def get_number(pos_pattern_idx, base):
+        nr = 0
+        for tag_idx in pos_pattern_idx:
+            nr = nr * base + tag_idx
+
+        return nr
+
+    def __init__(self, lang="english"):
+        self.result_dict = {}
+        self.lang = lang
+        self.tagger = None
+
+
+    def initialize(self):
+        ## setup logging
+        root_log = logging.getLogger()
+        root_log.setLevel(logging.ERROR)
+
+        stdout_log = logging.StreamHandler(sys.stdout)
+        stdout_log.setLevel(logging.ERROR)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        stdout_log.setFormatter(formatter)
+        root_log.addHandler(stdout_log)
+
+        ## initialize the treetagger instance
+        lang_abrev = LANG_ABREV.get(self.lang)
+        if lang_abrev is None:
+            raise ValueError("Unsupported language {}!".format(self.lang))
+
+        self.tagger = treetaggerwrapper.TreeTagger(TAGLANG=lang_abrev, TAGDIR=self.TREETAGGER_DIR)
+
+        ## read pos pattern list and POS tagset for selected language
+        pos_pattern_filename = self.POS_PATTERN_DIR + os.path.sep + "Patterns_{}_TreeTagger.csv".format(self.lang)
+        pos_tagset_filename = self.POS_PATTERN_DIR + os.path.sep + "tagset_{}.txt".format(self.lang)
+
+        self.pos_pattern_list = None
+        self.pos_tagset = None
+
+        with open(pos_pattern_filename) as f:
+            csv_reader = csv.reader(f, delimiter=';')
+            self.pos_pattern_list = [{"pattern" : row[0].strip().split(), "freq" : int(row[1])} for row in csv_reader]
+
+        with open(pos_tagset_filename) as f:
+            tags = [t.strip() for t in f.readlines()]
+            self.pos_tagset = dict([(tags[idx], (idx + 1)) for idx in range(len(tags))])
+
+        if self.pos_pattern_list is None:
+            raise Exception("Could not load POS patterns for selected language {}.".format(self.lang))
+
+        if self.pos_tagset is None:
+            raise Exception("Could not load POS tagset for selected language {}.".format(self.lang))
+
+        self.pos_pattern_numbers = self._convert_name_to_index(self.pos_pattern_list)
+
+        ## load sentence tokenizer for selected language
+        tokenizer_path = 'tokenizers/punkt/{}.pickle'.format(self.lang)
+        self.sentence_tokenizer = nltk.data.load(tokenizer_path)
+        if self.sentence_tokenizer is None:
+            raise Exception("Could not load sentence tokenizer for selected language {}.".format(self.lang))
+
+        ## initialize POSFilter instance
+        self.pos_filter = POSFilter(self.pos_pattern_numbers, self.pos_tagset)
+
+    def _cleanup(self):
+        ## close the tagger instance
+        if not self.tagger is None:
+            self.tagger.__del__()
+            self.tagger = None
+
+
+    def _convert_name_to_index(self, pos_pattern_list):
+        base = len(self.pos_tagset) + 1
+        return [{'pattern': row['pattern'], 'pattern_nr' : self.convert(row['pattern'], base, self.pos_tagset), 'freq' : row['freq']} for row in pos_pattern_list]
+
+    @staticmethod
+    def _extract_tagger_info(tag):
+        tag_info = tag.split("\t")
+        return {'word' : tag_info[0], 'pos' : tag_info[1], 'lemma':tag_info[2]}
+
+
+    def execute(self, website_data_dict):
+        try:
+            ## 1) initialize
+            print "Initializing extractor ..."
+            self._initialize()
+
+            self.result_dict['t1gram'] = []
+            self.result_dict['t2gram'] = []
+            self.result_dict['t3gram'] = []
+            self.result_dict['t4gram'] = []
+
+            ## 2) execute
+            # take each paragraph and split it into sentences
+            paragraphs = website_data_dict.get(WebsiteDataExtractor.MAIN_TEXT)
+            if not paragraphs is None:
+                for p in paragraphs:
+                    sentence_list = self.sentence_tokenizer.tokenize(p.strip())
+                    for s in sentence_list:
+                        tagged_sentence_info = map(self._extract_tagger_info, self.tagger.tag_text(s))
+                        clean_sentence_info = [info for info in tagged_sentence_info if info['pos'] in self.pos_tagset]
+                        sentence_tag_idx = [self.pos_tagset[info['pos']] for info in clean_sentence_info]
+
+                        selected_term_slices = self.pos_filter.filter(sentence_tag_idx)
+                        for term_slice in selected_term_slices:
+                            diff = term_slice[1] - term_slice[0]
+                            if diff == 1:
+                                self.result_dict['t1gram'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
+                                                                   [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
+                            elif diff == 2:
+                                self.result_dict['t2gram'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
+                                                                   [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
+                            elif diff == 3:
+                                self.result_dict['t3gram'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
+                                                                   [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
+                            else:
+                                self.result_dict['t4gram'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
+                                                                   [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
+
+
+        except Exception as ex:
+            logging.getLogger().exception("Failed to perform candidate keyterm extraction.")
+        finally:
+            self._cleanup()
+
+
+class POSFilter(object):
+    """
+    The class performs filtering of candidate keyterms based on patterns of POS tags.
+    """
+    def __init__(self, pos_patterns, tagset):
+        '''
+        :param pos_patterns:  list where each element is itself a list representing the sequence of POS tags making up a pattern
+        :param tagset: complete set of tags for the chosen language on which this pattern filter will run
+        '''
+        self.tagset = tagset
+        self.pos_patterns = self._order_patterns(pos_patterns)
+        self.max_pattern_len = len(self.pos_patterns[-1])
+
+        ## call initialization
+        self._initialize()
+
+
+    def _order_patterns(self, pos_patterns):
+        return sorted(pos_patterns, key = lambda row : len(row['pattern']))
+
+
+    def _initialize(self):
+        plen = 1
+        d = {}
+        for p in self.pos_patterns:
+            if len(p['pattern']) == plen:
+                if not plen in d:
+                    d[plen] = set([p['pattern_nr']])
+                else:
+                    d[plen].add(p['pattern_nr'])
+            else:
+                plen = len(p['pattern'])
+                if not plen in d:
+                    d[plen] = set([p['pattern_nr']])
+                else:
+                    d[plen].add(p['pattern_nr'])
+
+        self.clustered_patterns = d.items()
+
+
+    def filter(self, sentence_pos_idx):
+        selected = []
+
+        for patterns_by_len in self.clustered_patterns:
+            plen = patterns_by_len[0]
+            #print "Running for patterns of length: " + str(plen)
+
+            pattern_set = patterns_by_len[1]
+            #pprint.pprint(pattern_set)
+
+            ## generate all ngrams of sentence_pos_list of length plen
+            grams = [(i, i + plen, KeyTermExtractor2.get_number(sentence_pos_idx[i : i + plen], len(self.tagset) + 1))
+                             for i in xrange(len(sentence_pos_idx) - plen + 1)]
+
+            for gram in grams:
+                if gram[2] in pattern_set:
+                    selected.append(gram)
+
+        return selected

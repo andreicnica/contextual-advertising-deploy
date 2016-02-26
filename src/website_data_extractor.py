@@ -26,6 +26,8 @@ class WebsiteDataExtractor(object):
     customPaths = {}
 
     def __init__(self, definitionsFile):
+        print "INIT Website Data Extractor"
+
         tree = ET.parse(definitionsFile)
         root = tree.getroot()
         for child in root:
