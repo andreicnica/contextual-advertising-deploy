@@ -3,7 +3,7 @@
 __author__ = 'andrei'
 
 from lxml import etree
-import urllib, sys, re
+import urllib, sys, re, pprint
 import xml.etree.ElementTree as ET
 
 class WebsiteDataExtractor(object):
@@ -138,13 +138,15 @@ class WebsiteDataExtractor(object):
                 ls = []
                 for aux in s:
                     if (isinstance(aux, etree._Element)):
-                        val = aux.xpath('.//text()')
+                        val = aux.xpath('.//text()[not(parent::script)]')
                         for m in val:
                             if (m.isspace() or not m):
                                 val.remove(m)
                         if (val):
                             ls = ls + [val]
                 s = map(lambda x: " ".join(x), ls)
+                pprint.pprint(s)
+
                 s = map(self.clean_string_partial, s)
             else:
                 s = map(self.clean_string_partial, s)
