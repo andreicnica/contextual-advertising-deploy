@@ -1,8 +1,9 @@
 __author__ = 'alex'
 
+
 import os, shutil, subprocess, codecs, sys
 import treetaggerwrapper, csv
-import logging, pprint
+import logging, math
 import nltk.data
 
 from utils.functions import LANG_ABREV
@@ -183,6 +184,73 @@ class KeyTermExtractor2(object):
     def _extract_tagger_info(tag):
         tag_info = tag.split("\t")
         return {'word' : tag_info[0], 'pos' : tag_info[1], 'lemma':tag_info[2]}
+
+    @staticmethod
+    def calcCvalue(gramsDict):
+
+        def isSubList(list, sublist):
+            ns = len(sublist)
+            for t in range(len(list) - len(sublist) + 1):
+                if list[t] == sublist[0]:
+                    if list[t+1:t+len(sublist)] == sublist[1:]:
+                        return True
+            return False
+
+
+        #!!Parameters will pe modifyed
+        nr_grams = len(gramsDict)
+        grams = ["t" + str(index) + "grams" for index in range(1, len(gramsDict) + 1)]
+        termsLema = {}
+
+        #count freq inside each txgram
+        for key, value in gramsDict.iteritems():
+            termsLema[key] = {}
+            for tple in value:
+                termLema = " ".join(tple[1])
+
+                if termLema in termsLema[key]:
+                    termsLema[key][termLema]["tf"] += 1
+                    if tple[0] not in termsLema[key][termLema]["terms"]:
+                        termsLema[key][termLema]["terms"].append(tple[0])
+                else:
+                    termsLema[key][termLema] = {}
+                    termsLema[key][termLema]["terms"] = [tple[0]]
+                    termsLema[key][termLema]["lemaL"] = tple[1]
+                    termsLema[key][termLema]["tf"] = 1
+
+
+        for i in reversed(range(nr_grams)):
+            for lema, lemaV in termsLema[grams[i]].iteritems():
+                #check bigger terms for candidates
+                nr_candidate_terms = 0
+                sum_tf_candidate_terms = 0
+                for j in range(i + 1, nr_grams):
+                    for pt, ptv in termsLema[grams[j]].iteritems():
+                        if isSubList(ptv["lemaL"], lemaV["lemaL"]):
+                            nr_candidate_terms += 1
+                            sum_tf_candidate_terms += ptv["tf"]
+
+                if nr_candidate_terms == 0:
+                    lemaV["cval"] = math.log(len(lema), 2) * lemaV["tf"]
+                else:
+                    lemaV["cval"] = math.log(len(lema), 2) * (lemaV["tf"] - sum_tf_candidate_terms / nr_candidate_terms)
+
+        terms = {}
+
+        for tgram, tgramVal in termsLema.iteritems():
+            terms[tgram] = {}
+            for termLema, termLemaV in tgramVal.iteritems():
+                for termL in termLemaV["terms"]:
+                    term = " ".join(termL)
+                    terms[tgram][term] = {}
+                    terms[tgram][term]["words"] = termL
+                    terms[tgram][term]["lemma_string"] = termLema
+                    terms[tgram][term]["lemma_list"] = termLemaV["lemaL"]
+                    terms[tgram][term]["tf"] = termLemaV["tf"]
+                    terms[tgram][term]["cvalue"] = termLemaV["cval"]
+                    terms[tgram][term]["len"] = len(term)
+
+        return terms
 
 
     def execute(self, website_data_dict):
