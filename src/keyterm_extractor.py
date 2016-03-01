@@ -2,11 +2,11 @@ __author__ = 'alex'
 
 
 import os, shutil, subprocess, codecs, sys
-import treetaggerwrapper, csv
+import csv
 import logging, math
 import nltk.data
 
-from utils.functions import LANG_ABREV
+from utils.functions import LANG_ABREV, extract_tagger_info, LANG_EN
 from website_data_extractor import WebsiteDataExtractor
 
 
@@ -93,7 +93,7 @@ class KeyTermExtractor(object):
 
 
 class KeyTermExtractor2(object):
-    EXTRACTOR_ROOT_DIR = "." + os.path.sep + "biotex-term-extraction"
+    EXTRACTOR_ROOT_DIR = "." + os.path.sep + "resources"
     TREETAGGER_DIR = EXTRACTOR_ROOT_DIR + os.path.sep + "TreeTagger"
     POS_PATTERN_DIR = EXTRACTOR_ROOT_DIR + os.path.sep + "patterns"
 
@@ -113,29 +113,17 @@ class KeyTermExtractor2(object):
 
         return nr
 
-    def __init__(self, lang="english"):
-        self.result_dict = {}
+    def __init__(self, tagger, lang = LANG_EN):
+        self.candidates = None
         self.lang = lang
-        self.tagger = None
+        self.tagger = tagger
 
 
     def initialize(self):
-        ## setup logging
-        root_log = logging.getLogger()
-        root_log.setLevel(logging.ERROR)
-
-        stdout_log = logging.StreamHandler(sys.stdout)
-        stdout_log.setLevel(logging.ERROR)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        stdout_log.setFormatter(formatter)
-        root_log.addHandler(stdout_log)
-
         ## initialize the treetagger instance
         lang_abrev = LANG_ABREV.get(self.lang)
         if lang_abrev is None:
             raise ValueError("Unsupported language {}!".format(self.lang))
-
-        self.tagger = treetaggerwrapper.TreeTagger(TAGLANG=lang_abrev, TAGDIR=self.TREETAGGER_DIR)
 
         ## read pos pattern list and POS tagset for selected language
         pos_pattern_filename = self.POS_PATTERN_DIR + os.path.sep + "Patterns_{}_TreeTagger.csv".format(self.lang)
@@ -169,21 +157,15 @@ class KeyTermExtractor2(object):
         ## initialize POSFilter instance
         self.pos_filter = POSFilter(self.pos_pattern_numbers, self.pos_tagset)
 
-    def _cleanup(self):
-        ## close the tagger instance
-        if not self.tagger is None:
-            self.tagger.__del__()
-            self.tagger = None
+
+    def cleanup(self):
+        pass
 
 
     def _convert_name_to_index(self, pos_pattern_list):
         base = len(self.pos_tagset) + 1
         return [{'pattern': row['pattern'], 'pattern_nr' : self.convert(row['pattern'], base, self.pos_tagset), 'freq' : row['freq']} for row in pos_pattern_list]
 
-    @staticmethod
-    def _extract_tagger_info(tag):
-        tag_info = tag.split("\t")
-        return {'word' : tag_info[0], 'pos' : tag_info[1], 'lemma':tag_info[2]}
 
     @staticmethod
     def calcCvalue(gramsDict):
@@ -236,66 +218,67 @@ class KeyTermExtractor2(object):
                     lemaV["cval"] = math.log(len(lema), 2) * (lemaV["tf"] - sum_tf_candidate_terms / nr_candidate_terms)
 
         terms = {}
-
         for tgram, tgramVal in termsLema.iteritems():
-            terms[tgram] = {}
+            # terms[tgram] = {}
             for termLema, termLemaV in tgramVal.iteritems():
                 for termL in termLemaV["terms"]:
                     term = " ".join(termL)
-                    terms[tgram][term] = {}
-                    terms[tgram][term]["words"] = termL
-                    terms[tgram][term]["lemma_string"] = termLema
-                    terms[tgram][term]["lemma_list"] = termLemaV["lemaL"]
-                    terms[tgram][term]["tf"] = termLemaV["tf"]
-                    terms[tgram][term]["cvalue"] = termLemaV["cval"]
-                    terms[tgram][term]["len"] = len(term)
+                    # terms[tgram][term] = {}
+                    # terms[tgram][term]["words"] = termL
+                    # terms[tgram][term]["lemma_string"] = termLema
+                    # terms[tgram][term]["lemma_list"] = termLemaV["lemaL"]
+                    # terms[tgram][term]["tf"] = termLemaV["tf"]
+                    # terms[tgram][term]["cvalue"] = termLemaV["cval"]
+                    # terms[tgram][term]["len"] = len(term)
+                    terms[term] = {
+                        "words" : termL,
+                        "lemma_string" : termLema,
+                        "lemma_list" : termLemaV["lemaL"],
+                        "tf" : termLemaV["tf"],
+                        "cvalue" : termLemaV["cval"],
+                        "len" : len(term)
+                    }
 
         return terms
 
 
     def execute(self, website_data_dict):
-        try:
-            ## 1) initialize
-            print "Initializing extractor ..."
-            self._initialize()
+        grams_dict = {
+            't1grams' : [],
+            't2grams' : [],
+            't3grams' : [],
+            't4grams' : []
+        }
 
-            self.result_dict['t1gram'] = []
-            self.result_dict['t2gram'] = []
-            self.result_dict['t3gram'] = []
-            self.result_dict['t4gram'] = []
+        ## 2) execute
+        # take each paragraph and split it into sentences
+        paragraphs = website_data_dict.get(WebsiteDataExtractor.MAIN_TEXT)
+        if not paragraphs is None:
+            for p in paragraphs:
+                sentence_list = self.sentence_tokenizer.tokenize(p.strip())
+                for s in sentence_list:
+                    tagged_sentence_info = map(extract_tagger_info, self.tagger.tag_text(s))
+                    clean_sentence_info = [info for info in tagged_sentence_info if info['pos'] in self.pos_tagset]
+                    sentence_tag_idx = [self.pos_tagset[info['pos']] for info in clean_sentence_info]
 
-            ## 2) execute
-            # take each paragraph and split it into sentences
-            paragraphs = website_data_dict.get(WebsiteDataExtractor.MAIN_TEXT)
-            if not paragraphs is None:
-                for p in paragraphs:
-                    sentence_list = self.sentence_tokenizer.tokenize(p.strip())
-                    for s in sentence_list:
-                        tagged_sentence_info = map(self._extract_tagger_info, self.tagger.tag_text(s))
-                        clean_sentence_info = [info for info in tagged_sentence_info if info['pos'] in self.pos_tagset]
-                        sentence_tag_idx = [self.pos_tagset[info['pos']] for info in clean_sentence_info]
+                    selected_term_slices = self.pos_filter.filter(sentence_tag_idx)
+                    for term_slice in selected_term_slices:
+                        diff = term_slice[1] - term_slice[0]
+                        if diff == 1:
+                            grams_dict['t1grams'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
+                                                         [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
+                        elif diff == 2:
+                            grams_dict['t2grams'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
+                                                         [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
+                        elif diff == 3:
+                            grams_dict['t3grams'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
+                                                         [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
+                        else:
+                            grams_dict['t4grams'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
+                                                         [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
 
-                        selected_term_slices = self.pos_filter.filter(sentence_tag_idx)
-                        for term_slice in selected_term_slices:
-                            diff = term_slice[1] - term_slice[0]
-                            if diff == 1:
-                                self.result_dict['t1gram'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
-                                                                   [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
-                            elif diff == 2:
-                                self.result_dict['t2gram'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
-                                                                   [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
-                            elif diff == 3:
-                                self.result_dict['t3gram'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
-                                                                   [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
-                            else:
-                                self.result_dict['t4gram'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
-                                                                   [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
+        self.candidates = self.calcCvalue(grams_dict)
 
-
-        except Exception as ex:
-            logging.getLogger().exception("Failed to perform candidate keyterm extraction.")
-        finally:
-            self._cleanup()
 
 
 class POSFilter(object):

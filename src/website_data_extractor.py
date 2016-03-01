@@ -46,6 +46,9 @@ class WebsiteDataExtractor(object):
                 if domain:
                     self.customPaths[domain] = parsers
 
+    def cleanup(self):
+        pass
+
 
     def getElementPaths(self, url):
         for domain in self.customPaths.keys():
@@ -104,10 +107,12 @@ class WebsiteDataExtractor(object):
             token_path = url_path.split('.')[0]
 
             # remove numbers from token path
-            numeric_regex = r"(" + WebsiteDataExtractor.URL_TOKEN_SEPARATOR + "[0-9]+)*"
+            numeric_regex = ur"(" + WebsiteDataExtractor.URL_TOKEN_SEPARATOR + "[0-9]+)*"
             token_path = re.sub(numeric_regex, "", token_path)
 
             tokens = token_path.split(WebsiteDataExtractor.URL_TOKEN_SEPARATOR)
+            tokens = map(lambda x : x if isinstance(x, unicode) else unicode(x, 'utf-8'), tokens)
+
             return tokens
 
 
@@ -133,9 +138,9 @@ class WebsiteDataExtractor(object):
             s = tree.xpath(elPattern)
 
             if el in self.CONCAT_ANSWERS:
-                s = self.clean_string_full(" ".join(s))
+                s = self.clean_string_full(u" ".join(s))
             elif el in self.CONCAT_SENTENCES:
-                s = self.clean_string_partial(" ".join(s))
+                s = self.clean_string_partial(u" ".join(s))
             elif el in self.GROUP_BY_CHILDREN:
                 ls = []
                 for aux in s:
@@ -146,11 +151,11 @@ class WebsiteDataExtractor(object):
                                 val.remove(m)
                         if (val):
                             ls = ls + [val]
-                s = map(lambda x: " ".join(x), ls)
-                pprint.pprint(s)
-
+                s = map(lambda x: u" ".join(x), ls)
                 s = map(self.clean_string_partial, s)
             else:
+                ## here we treat imageCaptions and urlTokens
+                s = map(lambda x : x if isinstance(x, unicode) else unicode(x, 'utf-8'), s)
                 s = map(self.clean_string_partial, s)
                 s = filter(None, s)
 

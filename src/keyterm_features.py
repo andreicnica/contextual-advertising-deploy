@@ -1,6 +1,6 @@
 __author__ = 'alex'
 
-import pandas as pd
+import pandas as pd, pprint
 import utils.functions as utils
 from website_data_extractor import WebsiteDataExtractor
 
@@ -37,12 +37,12 @@ class KeyTermFeatures(object):
         # create df from website_data_dict
         website_data_df = pd.DataFrame.from_dict({self.url : self.website_data_dict}, orient = 'index')
         feature_extractor = utils.TextualFeatureExtractor(website_data_df,
-                                        urlTokenColum=WebsiteDataExtractor.URL_TOKENS,
-                                        titleColumn=WebsiteDataExtractor.TITLE,
-                                        descriptionColumn=WebsiteDataExtractor.SUMMARY,
-                                        textzoneColumn=WebsiteDataExtractor.MAIN_TEXT,
-                                        anchorColumn=WebsiteDataExtractor.HYPERLINKS,
-                                        imgDescColumn=WebsiteDataExtractor.IMAGE_CAPTION)
+                                                          urlTokenColumn=WebsiteDataExtractor.URL_TOKENS,
+                                                          titleColumn=WebsiteDataExtractor.TITLE,
+                                                          descriptionColumn=WebsiteDataExtractor.SUMMARY,
+                                                          textzoneColumn=WebsiteDataExtractor.MAIN_TEXT,
+                                                          anchorColumn=WebsiteDataExtractor.HYPERLINKS,
+                                                          imgDescColumn=WebsiteDataExtractor.IMAGE_CAPTION)
 
         # 1) compute TF
         doc.compute_tf()
@@ -70,14 +70,19 @@ class KeyTermFeatures2(object):
         self.lang = lang
         self.tagger = tagger
 
+    def cleanup(self):
+        pass
+
     def compute_features(self, url, website_data_dict, keyterm_candidates):
         ## create document
         doc = utils.Document(url, lang=self.lang)
 
-
         doc_terms = []
         for text, info in keyterm_candidates.items():
-            d = {'text' : term}.update(info)
+            d = {'text' : text}
+            d.update(info)
+
+            # pprint.pprint(d)
             term = utils.Term(d, doc, lang = self.lang)
             doc_terms.append(term)
 
@@ -87,16 +92,16 @@ class KeyTermFeatures2(object):
         # create df from website_data_dict and instantiate feature extractor
         website_data_df = pd.DataFrame.from_dict({url : website_data_dict}, orient = 'index')
         feature_extractor = utils.TextualFeatureExtractor(url, website_data_df, self.tagger,
-                                        urlTokenColum=WebsiteDataExtractor.URL_TOKENS,
-                                        titleColumn=WebsiteDataExtractor.TITLE,
-                                        descriptionColumn=WebsiteDataExtractor.SUMMARY,
-                                        textzoneColumn=WebsiteDataExtractor.MAIN_TEXT,
-                                        anchorColumn=WebsiteDataExtractor.HYPERLINKS,
-                                        imgDescColumn=WebsiteDataExtractor.IMAGE_CAPTION)
+                                                          urlTokenColumn=WebsiteDataExtractor.URL_TOKENS,
+                                                          titleColumn=WebsiteDataExtractor.TITLE,
+                                                          descriptionColumn=WebsiteDataExtractor.SUMMARY,
+                                                          textzoneColumn=WebsiteDataExtractor.MAIN_TEXT,
+                                                          anchorColumn=WebsiteDataExtractor.HYPERLINKS,
+                                                          imgDescColumn=WebsiteDataExtractor.IMAGE_CAPTION)
 
         term_dataset = []
         for term in doc.relevant_terms:
-            # 2) compute linguistic features
+            # compute linguistic features
             term.set_textual_feature_extractor(feature_extractor)
             term.extract_textual_features()
 

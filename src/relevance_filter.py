@@ -1,15 +1,21 @@
-import pandas as pd
+from statsmodels.discrete.discrete_model import LogitResults
 
 class RelevanceFilter(object):
-    def __init__(self, keyterm_feature_df, saved_classifier_file, topk = 10):
-        self.keyterm_feature_df = keyterm_feature_df
+    def __init__(self, saved_classifier_file, topk = 10):
         self._classifier_file = saved_classifier_file
         self.topk = topk
 
-    def _top_selection(self):
+        self.model = LogitResults.load(saved_classifier_file)
+
+
+    def cleanup(self):
+        pass
+
+
+    def _top_selection(self, keyterm_feature_df):
         selection = []
 
-        for row in self.keyterm_feature_df.itertuples(index = False):
+        for row in keyterm_feature_df.itertuples(index = False):
             row_set = set(row[0].split())
 
             subsumed = False
@@ -17,7 +23,7 @@ class RelevanceFilter(object):
             subsumes_index = 0
 
             for idx in range(len(selection)):
-                term_set = set(selection[idx].split())
+                term_set = set(selection[idx]['term'].split())
 
                 if not (row_set - term_set):
                     subsumed = True
@@ -30,33 +36,29 @@ class RelevanceFilter(object):
             if subsumed:
                 continue
             elif subsumes:
-                selection[subsumes_index] = row[0]
+                selection[subsumes_index] = {'term': row[0], 'cvalue' : row[1] }
             else:
-                selection.append(row[0])
+                selection.append({'term': row[0], 'cvalue' : row[1] })
 
             if len(selection) == self.topk:
                 break
 
         return selection
 
-
-
-    def select_relevant(self):
-        from statsmodels.discrete.discrete_model import LogitResults
-
-        # load classifier model
-        model = LogitResults.load("dataset/keyterm-classifier-model-v3.pickle")
-
+    
+    def select_relevant(self, keyterm_feature_df):
         # prepare feature df
-        X = self.keyterm_feature_df.copy()
+        X = keyterm_feature_df.copy()
         X = X.drop(['doc_url', "is_url", 'term'], axis = 1)
         X['intercept'] = 1
 
-        self.keyterm_feature_df['relevant_pred'] = model.predict(X)
-        self.keyterm_feature_df.sort_values(["relevant_pred", "cvalue"], ascending=[False,False], inplace=True)
+        keyterm_feature_df['relevant_pred'] = self.model.predict(X)
+        keyterm_feature_df.sort_values(["relevant_pred", "cvalue"], ascending=[False,False], inplace=True)
         # self.keyterm_feature_df.sort_values(["relevant_pred", "tf"], ascending=[False,False], inplace=True)
 
         #topk_keyterms = self.keyterm_feature_df[:self.topk]['term'].values
-        topk_keyterms = self._top_selection()
+        topk_keyterms = self._top_selection(keyterm_feature_df.ix[:, ['term', 'cvalue']])
+        topk_keyterms.sort(key = lambda x : x['cvalue'], reverse=True)
+
         return topk_keyterms
 
