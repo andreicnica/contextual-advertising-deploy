@@ -181,4 +181,7 @@ if __name__ == "__main__":
 
     # create keyterm extractor service
     keytermExtractor = KeytermServerExtractor(port=port, lang=lang, topk=topk)
+    print "Test for example with a " + lang + " <link>:: http://localhost:"+ str(port) +"/?link=<link>"
+
     keytermExtractor.runServer()
+
