@@ -14,12 +14,14 @@ class WebsiteDataExtractor(object):
     HYPERLINKS = "hyperlinks"
     IMAGE_CAPTION = "imageCaption"
     URL_TOKENS = "urlTokens"
+    KEYWORDS = "keywords"
 
     URL_TOKEN_SEPARATOR = "-"
 
     CONCAT_ANSWERS = ["title"]
     CONCAT_SENTENCES = ["summary"]
     GROUP_BY_CHILDREN = ["mainText"]
+    META_KEYWORDS = ["keywords"]
 
     parser = etree.HTMLParser()
     defaultPaths = {}
@@ -153,6 +155,10 @@ class WebsiteDataExtractor(object):
                             ls = ls + [val]
                 s = map(lambda x: u" ".join(x), ls)
                 s = map(self.clean_string_partial, s)
+            elif el in self.META_KEYWORDS:
+                s = map(lambda x : x if isinstance(x, unicode) else unicode(x, 'utf-8'), s)
+                if s:
+                    s = s[0].split(",")
             else:
                 ## here we treat imageCaptions and urlTokens
                 s = map(lambda x : x if isinstance(x, unicode) else unicode(x, 'utf-8'), s)
@@ -164,7 +170,6 @@ class WebsiteDataExtractor(object):
         return pageData
 
 
-
-#test = WebsiteDataExtractor("dataset/WebsiteElementsPathDef.xml")
-#d = test.crawlPage("http://www.generation-nt.com/rechauffement-climatique-ere-glaciaire-retard-actualite-1923734.html")
+test = WebsiteDataExtractor("dataset/WebsiteElementsPathDef.xml")
+d = test.crawlPage("http://www.generation-nt.com/rechauffement-climatique-ere-glaciaire-retard-actualite-1923734.html")
 

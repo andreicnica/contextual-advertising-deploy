@@ -45,11 +45,11 @@ class RelevanceFilter(object):
 
         return selection
 
-    
+
     def select_relevant(self, keyterm_feature_df):
         # prepare feature df
         X = keyterm_feature_df.copy()
-        X = X.drop(['doc_url', "is_url", 'term'], axis = 1)
+        X = X.drop(['doc_url', "is_url", 'term', 'is_first_par', 'is_last_par'], axis = 1)
         X['intercept'] = 1
 
         keyterm_feature_df['relevant_pred'] = self.model.predict(X)

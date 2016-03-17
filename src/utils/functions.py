@@ -81,8 +81,14 @@ def clean_string(text):
 
 
 def extract_tagger_info(tag):
+    #print tag
     tag_info = tag.split("\t")
-    return {'word' : tag_info[0], 'pos' : tag_info[1], 'lemma':tag_info[2]}
+
+    ## ensure cardinality lemmas keep the original number
+    if tag_info[2] == "@card@":
+        return {'word' : tag_info[0], 'pos' : tag_info[1], 'lemma':tag_info[0]}
+    else:
+        return {'word' : tag_info[0], 'pos' : tag_info[1], 'lemma':tag_info[2]}
 
 
 class TextualFeatureExtractor(object):
@@ -92,6 +98,9 @@ class TextualFeatureExtractor(object):
         self.doc_url = url
         self.df = df
         self.tagger = tagger
+
+        self.url_regex = re.compile(ur'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+
 
         if (type(df) != pd.DataFrame):
             raise ValueError("Df is not a pandas.Dataframe")
@@ -122,11 +131,16 @@ class TextualFeatureExtractor(object):
         url_token_list = self.df.loc[self.doc_url, self.urlTokenColum]
         summary_text = self.df.loc[self.doc_url, self.descriptionColumn]
 
-        self.title_lemma_line = ' '.join([info['lemma'] for info in map(extract_tagger_info, self.tagger.tag_text(title_line))])
-        self.anchor_lemmas = [' '.join([info['lemma'] for info in map(extract_tagger_info, self.tagger.tag_text(anchor_text))]) for anchor_text in anchor_list]
-        self.img_lemmas = [' '.join([info['lemma'] for info in map(extract_tagger_info, self.tagger.tag_text(caption))]) for caption in img_caption_list]
-        self.url_lemmas = [info['lemma'] for token in url_token_list for info in map(extract_tagger_info, self.tagger.tag_text(token))]
-        self.summary_lemmas = ' '.join([info['lemma'] for info in map(extract_tagger_info, self.tagger.tag_text(summary_text))])
+        self.title_lemma_line = ' '.join([info['lemma'] for info in map(extract_tagger_info, self.tagger.tag_text(title_line, notagurl=True, notagemail=True, notagip=True, notagdns=True))])
+
+        self.anchor_lemmas = [' '.join([info['lemma'] for info in map(extract_tagger_info, self.tagger.tag_text(anchor_text, notagurl=True, notagemail=True, notagip=True, notagdns=True))])
+                              for anchor_text in anchor_list]
+
+        self.img_lemmas = [' '.join([info['lemma'] for info in map(extract_tagger_info, self.tagger.tag_text(caption, notagurl=True, notagemail=True, notagip=True, notagdns=True))])
+                           for caption in img_caption_list]
+
+        self.url_lemmas = [info['lemma'] for token in url_token_list for info in map(extract_tagger_info, self.tagger.tag_text(token, notagurl=True, notagemail=True, notagip=True, notagdns=True))]
+        self.summary_lemmas = ' '.join([info['lemma'] for info in map(extract_tagger_info, self.tagger.tag_text(summary_text, notagurl=True, notagemail=True, notagip=True, notagdns=True))])
 
 
     @staticmethod
@@ -166,10 +180,10 @@ class TextualFeatureExtractor(object):
         # if (type(term) is list) or (type(term) is np.ndarray):
         #     term = " ".join(term)
         if isinstance(term_lemmas, (list, np.ndarray)):
-            return sum(map(lambda line: sum(map(lambda x: line.count(x), term_lemmas)), self.anchor_lemmas))
+            return sum(map(lambda line: sum(map(lambda x: line.count(x) if self.url_regex.search(x) is None else 0, term_lemmas)), self.anchor_lemmas))
 
         elif isinstance(term_lemmas, basestring):
-            return sum(map(lambda line: line.count(term_lemmas), self.anchor_lemmas))
+            return sum(map(lambda line: line.count(term_lemmas) if self.url_regex.search(term_lemmas) is None else 0, self.anchor_lemmas))
 
         else:
             return 0

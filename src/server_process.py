@@ -112,7 +112,8 @@ class KeytermServerExtractor(object):
         self.candidate_extractor.initialize()
 
         self.feature_extractor = KeyTermFeatures2(self.tagger, lang = self.lang)
-        self.relevance_filter = RelevanceFilter("dataset/keyterm-classifier-model-v3.pickle", topk = self.topk)
+        #self.relevance_filter = RelevanceFilter("dataset/keyterm-classifier-model-v3.pickle", topk = self.topk)
+        self.relevance_filter = RelevanceFilter("dataset/keyterm-classifier-model-updated.pickle", topk = self.topk)
 
     def _cleanup(self):
         self.tagger = None
