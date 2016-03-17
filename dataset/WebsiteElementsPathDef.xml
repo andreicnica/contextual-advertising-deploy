@@ -21,4 +21,47 @@
         <hyperlinks>//div[@itemprop="articleBody"]//a//text()</hyperlinks>
         <imageCaption>//div[@itemprop="articleBody"]//img/@alt|//div[@class="intro"]//img/@alt</imageCaption>
     </website>
+    <website>
+        <domain>http://www.journaldugeek.com/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@class="col-md-10 col-md-offset-1"]/node()</mainText>
+        <hyperlinks>//div[@class="col-md-10 col-md-offset-1"]//a//text()</hyperlinks>
+        <imageCaption>//div[@class="col-md-10 col-md-offset-1"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://www.journaldugamer.com/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@class="col-md-10 col-md-offset-1"]/node()</mainText>
+        <hyperlinks>//div[@class="col-md-10 col-md-offset-1"]//a//text()</hyperlinks>
+        <imageCaption>//div[@class="col-md-10 col-md-offset-1"]//img/@alt</imageCaption>
+    </website>
+
+    <website>
+        <domain>http://www.jdubuzz.com/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@class="col-md-10 col-md-offset-1"]/node()</mainText>
+        <hyperlinks>//div[@class="col-md-10 col-md-offset-1"]//a//text()</hyperlinks>
+        <imageCaption>//div[@class="col-md-10 col-md-offset-1"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://news.pixelistes.com/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@class="col-md-10 col-md-offset-1"]/node()</mainText>
+        <hyperlinks>//div[@class="col-md-10 col-md-offset-1"]//a//text()</hyperlinks>
+        <imageCaption>//div[@class="col-md-10 col-md-offset-1"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://www.societe.com/</domain>
+        <title>//div[@id="edition"]//h1//text()</title>
+        <summary>/html/head/meta[@property="og:description"]//@content</summary>
+        <mainText>//div[@class="textearticle"]/node()</mainText>
+        <hyperlinks>//div[@class="textearticle"]//a//text()</hyperlinks>
+        <imageCaption>//div[@id="edition"]//img/@alt</imageCaption>
+    </website>
+
+
 </elementPathsDefinitions>
