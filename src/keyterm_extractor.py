@@ -2,7 +2,7 @@ __author__ = 'alex'
 
 
 import os, shutil, subprocess, codecs, sys
-import csv
+import csv, re
 import logging, math
 import nltk.data
 
@@ -14,6 +14,11 @@ class KeyTermExtractor2(object):
     EXTRACTOR_ROOT_DIR = "." + os.path.sep + "resources"
     TREETAGGER_DIR = EXTRACTOR_ROOT_DIR + os.path.sep + "TreeTagger"
     POS_PATTERN_DIR = EXTRACTOR_ROOT_DIR + os.path.sep + "patterns"
+
+    url_regex = re.compile(ur'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+    email_regex = re.compile(ur"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)")
+    email_prefix_regex = re.compile(ur"(^[a-zA-Z0-9_.+-]+@$)")
+    email_suffix_regex = re.compile(ur"(^@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)")
 
     @staticmethod
     def convert(pos_pattern, base, tagset):
@@ -116,6 +121,7 @@ class KeyTermExtractor2(object):
                     termsLema[key][termLema] = {}
                     termsLema[key][termLema]["terms"] = [tple[0]]
                     termsLema[key][termLema]["lemaL"] = tple[1]
+                    termsLema[key][termLema]["pos"] = tple[2]
                     termsLema[key][termLema]["tf"] = 1
 
 
@@ -141,17 +147,11 @@ class KeyTermExtractor2(object):
             for termLema, termLemaV in tgramVal.iteritems():
                 for termL in termLemaV["terms"]:
                     term = " ".join(termL)
-                    # terms[tgram][term] = {}
-                    # terms[tgram][term]["words"] = termL
-                    # terms[tgram][term]["lemma_string"] = termLema
-                    # terms[tgram][term]["lemma_list"] = termLemaV["lemaL"]
-                    # terms[tgram][term]["tf"] = termLemaV["tf"]
-                    # terms[tgram][term]["cvalue"] = termLemaV["cval"]
-                    # terms[tgram][term]["len"] = len(term)
                     terms[term] = {
                         "words" : termL,
                         "lemma_string" : termLema,
                         "lemma_list" : termLemaV["lemaL"],
+                        "pos": termLemaV["pos"],
                         "tf" : termLemaV["tf"],
                         "cvalue" : termLemaV["cval"],
                         "len" : len(term)
@@ -182,18 +182,22 @@ class KeyTermExtractor2(object):
                     selected_term_slices = self.pos_filter.filter(sentence_tag_idx)
                     for term_slice in selected_term_slices:
                         diff = term_slice[1] - term_slice[0]
-                        if diff == 1:
-                            grams_dict['t1grams'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
-                                                         [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
-                        elif diff == 2:
-                            grams_dict['t2grams'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
-                                                         [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
-                        elif diff == 3:
-                            grams_dict['t3grams'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
-                                                         [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
-                        else:
-                            grams_dict['t4grams'].append(([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
-                                                         [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]]))
+                        gram_tuple = ([info['word'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
+                                     [info['lemma'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]],
+                                     [info['pos'] for info in clean_sentence_info[term_slice[0] : term_slice[1]]])
+
+                        term_text = "".join(gram_tuple[0])
+                        if self.url_regex.search(term_text) is None and self.email_regex.search(term_text) is None \
+                            and self.email_prefix_regex.search(term_text) is None and self.email_suffix_regex.search(term_text) is None \
+                            and not u"\u00A9" in term_text:
+                            if diff == 1:
+                                grams_dict['t1grams'].append(gram_tuple)
+                            elif diff == 2:
+                                grams_dict['t2grams'].append(gram_tuple)
+                            elif diff == 3:
+                                grams_dict['t3grams'].append(gram_tuple)
+                            else:
+                                grams_dict['t4grams'].append(gram_tuple)
 
         self.candidates = self.calcCvalue(grams_dict)
 

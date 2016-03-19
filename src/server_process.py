@@ -156,7 +156,7 @@ class KeytermServerExtractor(object):
 
         ## 4) Filter for relevancy and output top 10 keyterms
         print "[INFO] ==== Selecting relevant keyterms ===="
-        selected_keyterms = self.relevance_filter.select_relevant(candidate_keyterm_df)
+        selected_keyterms = self.relevance_filter.select_relevant(candidate_keyterm_df, self.candidate_extractor.candidates)
 
         # print "[INFO] ==== FINAL SELECTION ====="
         return selected_keyterms
