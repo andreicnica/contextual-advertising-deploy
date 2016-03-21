@@ -169,12 +169,29 @@ class KeyTermExtractor2(object):
         }
 
         ## 2) execute
-        # take each paragraph and split it into sentences
-        paragraphs = website_data_dict.get(WebsiteDataExtractor.MAIN_TEXT)
-        if not paragraphs is None:
-            for p in paragraphs:
-                sentence_list = self.sentence_tokenizer.tokenize(p.strip())
-                for s in sentence_list:
+        # take each paragraph and split it into sentences. Paragraphs include the TITLE and the SUMMARY sentences as well
+        title = website_data_dict.get(WebsiteDataExtractor.TITLE)
+        summary = website_data_dict.get(WebsiteDataExtractor.SUMMARY)
+        mainText = website_data_dict.get(WebsiteDataExtractor.MAIN_TEXT)
+
+        paragraphs = []
+        if not title is None and title:
+            paragraphs.append(title)
+
+        if not summary is None and summary:
+            paragraphs.append(summary)
+
+        if not mainText is None and mainText:
+            paragraphs.extend(mainText)
+
+        #paragraphs = website_data_dict.get(WebsiteDataExtractor.MAIN_TEXT)
+        #if not paragraphs is None:
+
+        for p in paragraphs:
+            sentence_list = self.sentence_tokenizer.tokenize(p.strip())
+            for s in sentence_list:
+                # check that the sentence is not empty
+                if s:
                     tagged_sentence_info = map(extract_tagger_info, self.tagger.tag_text(s, notagurl=True, notagemail=True, notagip=True, notagdns=True))
                     clean_sentence_info = [info for info in tagged_sentence_info if info['pos'] in self.pos_tagset]
                     sentence_tag_idx = [self.pos_tagset[info['pos']] for info in clean_sentence_info]

@@ -119,7 +119,6 @@ class WebsiteDataExtractor(object):
 
 
     def crawlPage(self, page):
-
         try:
             req = urllib.urlopen(page)
         except urllib.HTTPError, e:
@@ -171,5 +170,5 @@ class WebsiteDataExtractor(object):
 
 
 test = WebsiteDataExtractor("dataset/WebsiteElementsPathDef.xml")
-d = test.crawlPage("http://www.generation-nt.com/rechauffement-climatique-ere-glaciaire-retard-actualite-1923734.html")
+d = test.crawlPage("http://www.generation-nt.com/huawei-p9-waterproof-etanche-teasers-photos-actualite-1926204.html")
 

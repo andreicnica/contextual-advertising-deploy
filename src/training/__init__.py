@@ -53,11 +53,8 @@ def create_raw_dataset(output_filename):
         d = json.load(fp, encoding="utf-8")
         test_urls = d.keys()
 
-    print len(test_urls)
 
     train_urls = [x for x in all_urls if x not in test_urls]
-    print len(train_urls)
-
     train_urls = random.sample(train_urls, 4 * len(test_urls))
 
     # dataset urls are test + train
@@ -92,7 +89,7 @@ def create_candidate_term_dataset(dataset_scraped_file, output_filename):
         scraped_pages = json.load(fp, encoding="utf-8")
 
     ## load a candidate keyterm extractor
-    tagger = ttw.TreeTagger(TAGLANG='fr', TAGDIR=KeyTermExtractor2.TREETAGGER_DIR, )
+    tagger = ttw.TreeTagger(TAGLANG='fr', TAGDIR=KeyTermExtractor2.TREETAGGER_DIR)
     candidate_extractor = KeyTermExtractor2(tagger, lang = "french")
     candidate_extractor.initialize()
 
@@ -100,6 +97,11 @@ def create_candidate_term_dataset(dataset_scraped_file, output_filename):
     idx = 1
     for url, data in scraped_pages.items():
         print "[INFO] " + str(idx) + " :: Processing URL " + url
+
+        if data[WebsiteDataExtractor.MAIN_TEXT] is None or len(data[WebsiteDataExtractor.MAIN_TEXT]) == 0:
+            print "[INFO] " + str(idx) + " :: Skipping URL " + url
+            continue
+
         candidate_extractor.execute(data)
         candidates = candidate_extractor.candidates
 
@@ -224,7 +226,8 @@ class RelevanceClassifier(object):
         #self.X = self.selected_train_df.drop(['relevant', 'doc_url', 'term', 'df', 'tfidf'], axis = 1)
         print self.selected_train_df.describe()
 
-        self.X = self.selected_train_df.drop(['relevant', 'doc_url', 'term', 'is_url', 'is_first_par', 'is_last_par'], axis = 1)
+        #self.X = self.selected_train_df.drop(['relevant', 'doc_url', 'term', 'is_url', 'is_first_par', 'is_last_par'], axis = 1)
+        self.X = self.selected_train_df.drop(['relevant', 'doc_url', 'term', 'is_url', 'is_first_par', 'is_last_par', 'is_title', 'is_description'], axis = 1)
         self.y = self.selected_train_df['relevant']
 
 
@@ -237,7 +240,8 @@ class RelevanceClassifier(object):
 
         # self.X_test = self.selected_test_df.drop(['relevant', 'doc_url', 'term'], axis = 1)
         #self.X_test = self.selected_test_df.drop(['relevant', 'doc_url', 'term', 'df', 'tfidf'], axis = 1)
-        self.X_test = self.selected_test_df.drop(['relevant', 'doc_url', 'term', 'is_url', 'is_first_par', 'is_last_par'], axis = 1)
+        #self.X_test = self.selected_test_df.drop(['relevant', 'doc_url', 'term', 'is_url', 'is_first_par', 'is_last_par'], axis = 1)
+        self.X_test = self.selected_test_df.drop(['relevant', 'doc_url', 'term', 'is_url', 'is_first_par', 'is_last_par', 'is_title', 'is_description'], axis = 1)
         self.y_test = self.selected_test_df['relevant']
 
 
@@ -278,3 +282,9 @@ def train_relevance_classifier(train_dataset_file, test_dataset_file, model_outp
 
     print "Saving model ..."
     cl.model.save(model_output_file)
+
+"""
+create_candidate_term_dataset("dataset/scraped_pages_dataset.json", "dataset/candidate_keyterms_dataset_general.json")
+create_term_features_dataset("dataset/scraped_pages_dataset.json", "dataset/candidate_keyterms_dataset_general.json", "dataset/keyterms_features_train_general.json", "dataset/keyterms_features_test_general.json")
+train_relevance_classifier("dataset/keyterm_features_train_general.json", "dataset/keyterm_features_test_general.json", "dataset/keyterm-classifier-model-general.pickle")
+"""
