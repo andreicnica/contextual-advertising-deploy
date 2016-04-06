@@ -49,8 +49,10 @@ class RelevanceFilter(object):
                 continue
             elif subsumes:
                 selection[subsumes_index] = {'term': row[0], 'cvalue': row[1], 'tf': row[2], 'lemma': row[3], 'pos_tag': row[4] }
+                # selection[subsumes_index] = {'term': row[0], 'cvalue': row[1], 'lemma': row[3]}
             else:
                 selection.append({'term': row[0], 'cvalue' : row[1], 'tf': row[2], 'lemma': row[3], 'pos_tag': row[4] })
+                # selection.append({'term': row[0], 'cvalue' : row[1], 'lemma': row[3]})
 
             if len(selection) == self.topk:
                 break
