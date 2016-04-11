@@ -13,6 +13,9 @@ Send a POST request::
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 import sys, argparse, logging
+
+from pandas.msgpack._unpacker import default_read_extended_type
+
 from website_data_extractor import WebsiteDataExtractor
 from keyterm_extractor import KeyTermExtractor2
 from keyterm_features import KeyTermFeatures2
@@ -140,9 +143,19 @@ class KeytermServerExtractor(object):
 
 
     def extracTermsFromLink(self, link):
+
+        default_return = {"defaultPath": False, "dataIntegrity":False, "keyTerms":[]}
         ## 1) Extract webpage data
         print "[INFO] ==== Extracting webpage data ===="
         data_dict = self.data_scraper.crawlPage(link)
+
+        default_return["defaultPath"] = data_dict["defaultPath"]
+        default_return["dataIntegrity"] = data_dict["dataIntegrity"]
+
+        if data_dict["defaultPath"] or not data_dict["dataIntegrity"]:
+            return default_return
+
+
         #pprint.pprint(data_dict)
 
         ## 2) Extract candidate keyterms
@@ -160,7 +173,8 @@ class KeytermServerExtractor(object):
         selected_keyterms = self.relevance_filter.select_relevant(candidate_keyterm_df, self.candidate_extractor.candidates)
 
         # print "[INFO] ==== FINAL SELECTION ====="
-        return selected_keyterms
+        default_return["keyTerms"] = selected_keyterms
+        return default_return
 
 
 if __name__ == "__main__":

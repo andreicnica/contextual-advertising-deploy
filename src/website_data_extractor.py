@@ -55,9 +55,9 @@ class WebsiteDataExtractor(object):
     def getElementPaths(self, url):
         for domain in self.customPaths.keys():
             if domain in url:
-                return self.customPaths[domain]
+                return (self.customPaths[domain], False)
 
-        return self.defaultPaths
+        return (self.defaultPaths, True)
 
     @staticmethod
     def clean_string_partial(text):
@@ -132,11 +132,15 @@ class WebsiteDataExtractor(object):
 
         #print "ENCODING::" + req.headers.getparam("charset")
 
-        paths = self.getElementPaths(page)
+        (paths, defaultPath) = self.getElementPaths(page)
 
-        pageData = {"urlTokens" : self.tokenizeWebsiteUrl(page)}
+        pageData = {"urlTokens" : self.tokenizeWebsiteUrl(page), "defaultPath":defaultPath}
         for el, elPattern in paths.iteritems():
             s = tree.xpath(elPattern)
+
+            if len(s) <= 0:
+                pageData[el] = []
+                continue
 
             if el in self.CONCAT_ANSWERS:
                 s = self.clean_string_full(u" ".join(s))
@@ -166,7 +170,33 @@ class WebsiteDataExtractor(object):
 
             pageData[el] = s
 
+            pageData["dataIntegrity"] = self.checkIntegrity(pageData)
+
         return pageData
+
+    @staticmethod
+    def checkIntegrity(pageData):
+        #Vers_1 percentage of valid data
+        # nr_checked = 0.0
+        # nr_valid = 0.0
+        # for key, value in pageData.iteritems():
+        #     if isinstance(value,list) or isinstance(value,str):
+        #         nr_checked = nr_checked + 1
+        #         if len(value) > 0:
+        #             nr_valid = nr_valid + 1
+        # return (nr_valid/nr_checked) > 0.4
+
+        must_have = ["title", "mainText"]
+        for key in must_have:
+            if key not in pageData:
+                return False
+            else:
+                if len(pageData[key]) <= 0:
+                    return False
+
+        return True
+
+
 
 
 test = WebsiteDataExtractor("dataset/WebsiteElementsPathDef.xml")

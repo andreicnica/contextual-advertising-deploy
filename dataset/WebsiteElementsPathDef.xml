@@ -3,8 +3,8 @@
 <elementPathsDefinitions>
     <default>
         <title>/head/title/text()</title>
-        <description>//*[@class="description"]</description>
-        <keywords>/html/head/meta[@name="keywords"]/@content</keywords>
+        <description>//*[@class="description"]|//meta[@name="description"]//@content|//meta[@property="og:description"]//@content</description>
+        <siteKeywords>/html/head/meta[@name="keywords"]/@content</siteKeywords>
     </default>
     <website>
         <domain>http://www.generation-nt.com/</domain>
@@ -65,6 +65,85 @@
         <hyperlinks>//div[@class="textearticle"]//a//text()</hyperlinks>
         <imageCaption>//div[@id="edition"]//img/@alt</imageCaption>
     </website>
+    <website>
+        <domain>http://www.pausecafein.fr/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@itemprop="articleBody"]/node()</mainText>
+        <hyperlinks>//div[@itemprop="articleBody"]//a//text()</hyperlinks>
+        <imageCaption>//div[@id="edition"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://worldofwarcraft.judgehype.com/news/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@id="news-contenu"]/node()</mainText>
+        <hyperlinks>//div[@id="news-contenu"]//a//text()</hyperlinks>
+        <imageCaption>//div[@id="news-contenu"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://hearthstone.judgehype.com/news/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@id="news-contenu"]/node()</mainText>
+        <hyperlinks>//div[@id="news-contenu"]//a//text()</hyperlinks>
+        <imageCaption>//div[@id="news-contenu"]//img/@alt</imageCaption>
+    </website>
 
-
+    <website>
+        <domain>http://diablo3.judgehype.com/news/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@id="news-contenu"]/node()</mainText>
+        <hyperlinks>//div[@id="news-contenu"]//a//text()</hyperlinks>
+        <imageCaption>//div[@id="news-contenu"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://www.judgehype.com/news/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@id="news-contenu"]/node()</mainText>
+        <hyperlinks>//div[@id="news-contenu"]//a//text()</hyperlinks>
+        <imageCaption>//div[@id="news-contenu"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://www.jeuxonline.info</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@property="og:description"]//@content</summary>
+        <mainText>//div[@class="jol-article-body"]/node()</mainText>
+        <hyperlinks>//div[@class="jol-article-body"]//a//text()</hyperlinks>
+        <imageCaption>//div[@class="jol-article-body"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://heroes.judgehype.com/news/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@id="news-contenu"]/node()</mainText>
+        <hyperlinks>//div[@id="news-contenu"]//a//text()</hyperlinks>
+        <imageCaption>//div[@id="news-contenu"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://overwatch.judgehype.com/news/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@id="news-contenu"]/node()</mainText>
+        <hyperlinks>//div[@id="news-contenu"]//a//text()</hyperlinks>
+        <imageCaption>//div[@id="news-contenu"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://film-warcraft.judgehype.com/news/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@id="news-contenu"]/node()</mainText>
+        <hyperlinks>//div[@id="news-contenu"]//a//text()</hyperlinks>
+        <imageCaption>//div[@id="news-contenu"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://judgehype.com/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@id="news-casdontenu"]/node()</mainText>
+        <hyperlinks>//div[@id="news-ad"]//a//text()</hyperlinks>
+        <imageCaption>//div[@id="news-coasdntenu"]//img/@alt</imageCaption>
+    </website>
 </elementPathsDefinitions>
