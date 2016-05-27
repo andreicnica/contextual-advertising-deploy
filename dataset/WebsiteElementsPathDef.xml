@@ -162,5 +162,29 @@
         <hyperlinks>//div[@class="field-item even"][@property="content:encoded"]//a//text()</hyperlinks>
         <imageCaption>//div[@class="field-item even"][@property="content:encoded"]//img/@alt</imageCaption>
     </website>
-    
+    <website>
+        <domain>http://aliceadsl.closermag.fr/</domain>
+        <title>//h1[@class="article-title upper"]//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@class="article-content"]/node()</mainText>
+        <hyperlinks>//div[@class="article-content"]//a//text()</hyperlinks>
+        <imageCaption>//div[@class="article-content"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://aliceadsl.lemonde.fr/</domain>
+        <title>//h1[@class="tt2"]//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@class="contenu_article"]/node()</mainText>
+        <hyperlinks>//div[@class="contenu_article"]//a//text()</hyperlinks>
+        <imageCaption>//div[@class="contenu_article"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://aliceadsl.gqmagazine.fr/</domain>
+        <title>//div[@class="article-header"]/h1//text()</title>
+        <summary>//div[@class="article-header"]/h2//text()</summary>
+        <mainText>//div[@class="text-container capitalina"]/node()</mainText>
+        <hyperlinks>//div[@class="text-container capitalina"]//a//text()</hyperlinks>
+        <imageCaption>//div[@class="text-container capitalina"]//img/@alt</imageCaption>
+    </website>
+
 </elementPathsDefinitions>
