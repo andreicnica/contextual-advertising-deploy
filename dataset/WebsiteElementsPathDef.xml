@@ -146,4 +146,21 @@
         <hyperlinks>//div[@id="news-ad"]//a//text()</hyperlinks>
         <imageCaption>//div[@id="news-coasdntenu"]//img/@alt</imageCaption>
     </website>
+    <website>
+        <domain>http://portail.free.fr/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@name="description"]//@content</summary>
+        <mainText>//div[@id="articleContentInside"]/node()</mainText>
+        <hyperlinks>//div[@id="articleContentInside"]//a//text()</hyperlinks>
+        <imageCaption>//div[@id="articleContentInside"]//img/@alt</imageCaption>
+    </website>
+    <website>
+        <domain>http://www.planet.fr/</domain>
+        <title>/html/head/title//text()</title>
+        <summary>/html/head/meta[@property="og:description"]//@content</summary>
+        <mainText>//div[@class="field-item even"][@property="content:encoded"]/node()</mainText>
+        <hyperlinks>//div[@class="field-item even"][@property="content:encoded"]//a//text()</hyperlinks>
+        <imageCaption>//div[@class="field-item even"][@property="content:encoded"]//img/@alt</imageCaption>
+    </website>
+    
 </elementPathsDefinitions>
