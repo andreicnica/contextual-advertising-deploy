@@ -220,6 +220,54 @@ class KeyTermExtractor2(object):
 
 
 
+    def execute_with_snippet(self, text):
+        grams_dict = {
+            't1grams': [],
+            't2grams': [],
+            't3grams': [],
+            't4grams': []
+        }
+
+        if not isinstance(text, unicode):
+            text = unicode(text, "utf-8")
+
+        sentence_list = self.sentence_tokenizer.tokenize(text.strip())
+        for s in sentence_list:
+            # check that the sentence is not empty
+            if s:
+                tagged_sentence_info = map(extract_tagger_info,
+                                           self.tagger.tag_text(s, notagurl=True, notagemail=True, notagip=True,
+                                                                notagdns=True))
+                clean_sentence_info = [info for info in tagged_sentence_info if info['pos'] in self.pos_tagset]
+                sentence_tag_idx = [self.pos_tagset[info['pos']] for info in clean_sentence_info]
+
+                selected_term_slices = self.pos_filter.filter(sentence_tag_idx)
+                for term_slice in selected_term_slices:
+                    diff = term_slice[1] - term_slice[0]
+                    gram_tuple = ([info['word'] for info in clean_sentence_info[term_slice[0]: term_slice[1]]],
+                                  [info['lemma'] for info in clean_sentence_info[term_slice[0]: term_slice[1]]],
+                                  [info['pos'] for info in clean_sentence_info[term_slice[0]: term_slice[1]]])
+
+                    term_text = "".join(gram_tuple[0])
+                    if self.url_regex.search(term_text) is None and self.email_regex.search(term_text) is None \
+                            and self.email_prefix_regex.search(term_text) is None and self.email_suffix_regex.search(
+                        term_text) is None \
+                            and not u"\u00A9" in term_text:
+                        if diff == 1:
+                            grams_dict['t1grams'].append(gram_tuple)
+                        elif diff == 2:
+                            grams_dict['t2grams'].append(gram_tuple)
+                        elif diff == 3:
+                            grams_dict['t3grams'].append(gram_tuple)
+                        else:
+                            grams_dict['t4grams'].append(gram_tuple)
+
+
+        candidates = self.calcCvalue(grams_dict)
+        return candidates
+
+
+
 class POSFilter(object):
     """
     The class performs filtering of candidate keyterms based on patterns of POS tags.

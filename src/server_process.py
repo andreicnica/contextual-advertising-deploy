@@ -41,38 +41,57 @@ def makeServerHandlerClass(keytermExtractor):
             self.send_header('Content-type', 'application/json')
             self.end_headers()
 
+        def _set_no_response_headers(self):
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+
         def do_GET(self):
-            link = urlparse.parse_qs(urlparse.urlparse(self.path).query).get('link', None)
+            print self.path
+            if self.path.startswith("/sien-poc"):
+                parsed_qs = urlparse.parse_qs(urlparse.urlparse(self.path).query)
+                link = parsed_qs.get('link', None)
+                text = parsed_qs.get('text', None)
 
-            terms = self.extractTermsFromLink(link)
+                terms = self.extractFromLinkOrText(link, text)
+                self._set_headers()
+                self.wfile.write(json.dumps(terms))
+            else:
+                self._set_no_response_headers()
+                self.wfile.write("")
 
-            self._set_headers()
-
-            #send a page containing the list of terms
-            #self.wfile.write("<html><body><h1>%s</h1></body></html>" % terms)
-            self.wfile.write(json.dumps(terms))
 
         def do_HEAD(self):
             self._set_headers()
 
+
         def do_POST(self):
+            if self.path.startswith("/sien-poc"):
+                content_len = int(self.headers.getheader('content-length', 0))
+                post_body = self.rfile.read(content_len)
+                link = urlparse.parse_qs(post_body).get('link', None)
+                text = urlparse.parse_qs(post_body).get('text', None)
 
-            content_len = int(self.headers.getheader('content-length', 0))
-            post_body = self.rfile.read(content_len)
-            link = urlparse.parse_qs(post_body).get('link', None)
+                terms = self.extractFromLinkOrText(link, text)
+                self._set_headers()
+                self.wfile.write(json.dumps(terms))
+            else:
+                self._set_no_response_headers()
+                self.wfile.write("")
 
-            terms = self.extractTermsFromLink(link)
 
-            self._set_headers()
-            #send a list of terms
-            self.wfile.write(json.dumps(terms))
-
-        def extractTermsFromLink(self, link):
+        def extractFromLinkOrText(self, link, text):
             terms = []
-            if link:
-                #Run extractor only on first link sent
+            if not link is None:
+                # return JSON response with terms extracted from the link
                 terms = self.keytermExtractor.extracTermsFromLink(link[0])
+
+            elif not text is None:
+                # return JSON response with terms extracted from text snippet
+                terms = self.keytermExtractor.extractTermsFromText(text[0])
+
             return terms
+
 
     return ServerHandlerClass
 
@@ -143,38 +162,106 @@ class KeytermServerExtractor(object):
 
 
     def extracTermsFromLink(self, link):
+        default_return = {
+            "available_domains": ["http://www.generation-nt.com/", "http://www.maison.com/",
+                                  "http://www.journaldugeek.com/", "http://www.journaldugamer.com/",
+                                  "http://www.jdubuzz.com/", "http://news.pixelistes.com/",
+                                  "http://www.societe.com/", "http://www.pausecafein.fr/",
+                                  "http://worldofwarcraft.judgehype.com/news/",
+                                  "http://hearthstone.judgehype.com/news/", "http://diablo3.judgehype.com/news/",
+                                  "http://www.judgehype.com/news/",
+                                  "http://www.jeuxonline.info", "http://heroes.judgehype.com/news/",
+                                  "http://overwatch.judgehype.com/news/",
+                                  "http://film-warcraft.judgehype.com/news/", "http://judgehype.com/",
+                                  "http://portail.free.fr/", "http://www.planet.fr/",
+                                  "http://aliceadsl.closermag.fr/", "http://aliceadsl.lemonde.fr/",
+                                  "http://aliceadsl.gqmagazine.fr/"],
+            "defaultPath": False, "dataIntegrity":False, "keyTerms":[]}
 
-        default_return = {"defaultPath": False, "dataIntegrity":False, "keyTerms":[]}
-        ## 1) Extract webpage data
-        print "[INFO] ==== Extracting webpage data ===="
-        data_dict = self.data_scraper.crawlPage(link)
+        try:
+            ## 1) Extract webpage data
+            print "[INFO] ==== Extracting webpage data ===="
+            data_dict = self.data_scraper.crawlPage(link)
 
-        default_return["defaultPath"] = data_dict["defaultPath"]
-        default_return["dataIntegrity"] = data_dict["dataIntegrity"]
+            default_return["defaultPath"] = data_dict["defaultPath"]
+            default_return["dataIntegrity"] = data_dict["dataIntegrity"]
 
-        if data_dict["defaultPath"] or not data_dict["dataIntegrity"]:
+            if data_dict["defaultPath"] or not data_dict["dataIntegrity"]:
+                return default_return
+
+            #pprint.pprint(data_dict)
+            ## 2) Extract candidate keyterms
+            print "[INFO] ==== Extracting candidate keyterms ===="
+            self.candidate_extractor.execute(data_dict)
+
+            # print keyterm_extractor.result_dict
+            ## 3) Compute candidate keyterm features
+            print "[INFO] ==== Computing candidate keyterm features ===="
+            candidate_keyterm_df = self.feature_extractor.compute_features(link, data_dict, self.candidate_extractor.candidates)
+
+
+            ## 4) Filter for relevancy and output top 10 keyterms
+            print "[INFO] ==== Selecting relevant keyterms ===="
+            selected_keyterms = self.relevance_filter.select_relevant(candidate_keyterm_df, self.candidate_extractor.candidates)
+
+            # print "[INFO] ==== FINAL SELECTION ====="
+            default_return["keyTerms"] = selected_keyterms
+            return default_return
+
+        except:
             return default_return
 
 
-        #pprint.pprint(data_dict)
 
-        ## 2) Extract candidate keyterms
-        print "[INFO] ==== Extracting candidate keyterms ===="
-        self.candidate_extractor.execute(data_dict)
+    def extractTermsFromText(self, text):
+        default_return = {
+            "available_domains": ["http://www.generation-nt.com/", "http://www.maison.com/",
+                                  "http://www.journaldugeek.com/", "http://www.journaldugamer.com/",
+                                  "http://www.jdubuzz.com/", "http://news.pixelistes.com/",
+                                  "http://www.societe.com/", "http://www.pausecafein.fr/",
+                                  "http://worldofwarcraft.judgehype.com/news/",
+                                  "http://hearthstone.judgehype.com/news/", "http://diablo3.judgehype.com/news/",
+                                  "http://www.judgehype.com/news/",
+                                  "http://www.jeuxonline.info", "http://heroes.judgehype.com/news/",
+                                  "http://overwatch.judgehype.com/news/",
+                                  "http://film-warcraft.judgehype.com/news/", "http://judgehype.com/",
+                                  "http://portail.free.fr/", "http://www.planet.fr/",
+                                  "http://aliceadsl.closermag.fr/", "http://aliceadsl.lemonde.fr/",
+                                  "http://aliceadsl.gqmagazine.fr/"],
+            "defaultPath": False, "dataIntegrity": False, "keyTerms": []}
 
-        # print keyterm_extractor.result_dict
-        ## 3) Compute candidate keyterm features
-        print "[INFO] ==== Computing candidate keyterm features ===="
-        candidate_keyterm_df = self.feature_extractor.compute_features(link, data_dict, self.candidate_extractor.candidates)
 
 
-        ## 4) Filter for relevancy and output top 10 keyterms
-        print "[INFO] ==== Selecting relevant keyterms ===="
-        selected_keyterms = self.relevance_filter.select_relevant(candidate_keyterm_df, self.candidate_extractor.candidates)
+        try:
+            candidate_keyterms = self.candidate_extractor.execute_with_snippet(text)
+            keyterms = self.filter_candidates_from_snippet(candidate_keyterms)
 
-        # print "[INFO] ==== FINAL SELECTION ====="
-        default_return["keyTerms"] = selected_keyterms
-        return default_return
+            default_return["keyTerms"] = keyterms
+            return default_return
+        except:
+
+            logging.getLogger().exception("Error in keyterm extraction from text!")
+            return default_return
+
+
+    def filter_candidates_from_snippet(self, candidate_keyterms):
+        from functools import cmp_to_key
+
+        ordered_keyterms = sorted(candidate_keyterms.itervalues(), key = lambda item: item['cvalue'], reverse = True)
+        selected_keyterms = [item for item in ordered_keyterms if item['cvalue'] > 0]
+
+        def pos_cmp(keyterm1, keyterm2):
+            if not "NAM" in keyterm1['pos'] and "NAM" in keyterm2['pos']:
+                return -1
+            elif "NAM" in keyterm1['pos'] and "NAM" not in keyterm2['pos']:
+                return 1
+            else:
+                return 0
+
+        filtered_keyterms = sorted(selected_keyterms, key=cmp_to_key(pos_cmp), reverse=True)
+
+        keyterms = [{'term' : " ".join(t['words']), 'cvalue': t['cvalue'], 'lemma': t['lemma_string'], 'pos_tag': t['pos']} for t in filtered_keyterms]
+        return keyterms
 
 
 if __name__ == "__main__":
