@@ -35,6 +35,37 @@ def mytokenize(text, lang = LANG_EN):
     return [w for s in sentences for w in punctuation_regex.sub(" ", s).split()]
 
 
+def read_topkeyterms_from_file(txtfilepath, split=True):
+    if not split:
+        lines = [line.rstrip('\n') for line in open(txtfilepath)]
+    else:
+        lines = [line.rstrip('\n').split() for line in open(txtfilepath)]
+    return lines
+
+def filter_topkeyterms(keyterm_list, vocabulary):
+    keyterm_dict = {}
+
+    for keyterm in keyterm_list:
+        aux = [term for term in keyterm if term in vocabulary]
+
+        if aux:
+            k = " ".join(aux)
+
+            if not k in keyterm_dict:
+                keyterm_dict[k] = aux
+
+    return keyterm_dict.values()
+
+
+def test_top_keyterms(word_list, word2vec_model, filteredKeyterms, k):
+    result = map(lambda x: word2vec_model.n_similarity(x, word_list), filteredKeyterms)
+
+    filteredKeytermTuples = [(i, filteredKeyterms[i], result[i]) for i in range(len(filteredKeyterms))]
+    sortedKeytermTuples = sorted(filteredKeytermTuples, key=lambda x: x[1], reverse=True)
+
+    return sortedKeytermTuples[:k]
+
+
 def remove_stopwords(text, lang=LANG_EN):
     """
     :param text: Unicode string or list of words
