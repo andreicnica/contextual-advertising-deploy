@@ -58,8 +58,6 @@ def is_noun(term):
 
 
 def compare_extracted():
-
-
     with open(COMPARISON_FILE) as fp:
         test_data = json.load(fp)
 
