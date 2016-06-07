@@ -10,7 +10,7 @@ VECTOR_EMBEDDING_MODEL_FILE = EMBEDDING_MODEL_DIR + "/" + "frWac_non_lem_no_post
 
 TOP_ADV_KEYTERMS_FILE_RAW = "dataset/top10-keywords-ecommerce.txt"
 TOP_ADV_KEYTERMS_FILE_FILTERED = "dataset/top10-keywords-ecommerce-filtered.txt"
-EXTRACTED_KEYTERMS_FILE = "dataset/testDataTopPageViews_20Res/testTopPageViewsFiltered_20.json"
+EXTRACTED_KEYTERMS_FILE = "dataset/testData/testTopPageViewsFiltered_20.json"
 
 
 EXTRACTOR_ROOT_DIR = "./resources"
@@ -84,19 +84,17 @@ def load_embedding_model(binary = True):
     return Word2Vec.load_word2vec_format(VECTOR_EMBEDDING_MODEL_FILE, binary = binary)
 
 
-def load_extracted_keyterms():
+def load_extracted_keyterms(filepath):
     our_dict = {}
 
-    with open(EXTRACTED_KEYTERMS_FILE) as fp:
+    with open(filepath) as fp:
         test_data = json.load(fp)
         url_keys = test_data.keys()
-
         for url in url_keys:
             try:
                 our_data = json.loads(test_data[url]["keyterms"])
                 if our_data["dataIntegrity"]:
-                    if len(our_data["keyTerms"]) > 20:
-                        our_dict[url] = our_data["keyTerms"][:20]
+                    our_dict[url] = our_data["keyTerms"][:20]
             except ValueError:
                 pass
 

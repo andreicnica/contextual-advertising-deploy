@@ -127,3 +127,39 @@ class KeytermClassification(object):
 
         result = (np.array(result))[::-1]
         return result[:top]
+
+    def match_adv_keyterm_website(self, list_of_terms,
+                                  min_similarity_threshold=0.0, min_diff_distance=0.90, top=5):
+        orig_list = []
+        site_classes = {}
+
+        for d in list_of_terms:
+            d = d.copy()
+            d["adv_keyterms"] = self.match_adv_keyterm(d["term"],
+                                                  min_similarity_threshold=min_similarity_threshold,
+                                                  min_diff_distance=min_diff_distance, top=top)
+            for tup in d["adv_keyterms"]:
+                if tup[0] not in site_classes:
+                    site_classes[tup[0]] = {}
+                    site_classes[tup[0]]["freq"] = 1
+                    site_classes[tup[0]]["adv_keyterm"] = tup[0]
+                    site_classes[tup[0]]["similarity"] = [tup[1]]
+                    site_classes[tup[0]]["cvalues"] = [d["cvalue"]]
+                    site_classes[tup[0]]["source_term"] = [d["term"]]
+                    site_classes[tup[0]]["tf"] = [d["tf"]]
+                else:
+                    site_classes[tup[0]]["freq"] = site_classes[tup[0]]["freq"] + 1
+                    site_classes[tup[0]]["similarity"].append(tup[1])
+                    site_classes[tup[0]]["source_term"].append(d["term"])
+                    site_classes[tup[0]]["cvalues"].append(d["cvalue"])
+                    site_classes[tup[0]]["tf"].append(d["tf"])
+
+            orig_list.append(d)
+
+        site_classes = site_classes.values()
+        for d in site_classes:
+            d["score"] = sum(np.array(d["cvalues"], dtype=float) * np.array(d["similarity"], dtype=float))
+
+        site_classes.sort(key=lambda x: x["score"])
+        site_classes = np.array(site_classes)[::-1]
+        return (orig_list, site_classes)
