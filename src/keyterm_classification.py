@@ -27,7 +27,7 @@ class KeytermClassification(object):
     classes_filtered_keywords = []
 
     def __init__(self, classes=None, classesFile=None,
-                 modelPath="dataset/frWiki_no_lem_no_postag_no_phrase_1000_cbow_cut200.bin", modelBinary=True):
+                 modelPath="dataset/frWac_non_lem_no_postag_no_phrase_200_cbow_cut100.bin", modelBinary=True):
 
         if not(classes) and not(classesFile):
             print ""
