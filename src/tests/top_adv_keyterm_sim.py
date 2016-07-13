@@ -1,8 +1,10 @@
 from gensim.models import Word2Vec
+from gensim import matutils
 import json
 import pandas as pd
 import treetaggerwrapper as ttw
 from utils.functions import extract_tagger_info
+import numpy as np
 
 EMBEDDING_MODEL_DIR = "dataset/word2vec/french"
 #VECTOR_EMBEDDING_MODEL_FILE = EMBEDDING_MODEL_DIR + "/" + "frWiki_no_lem_no_postag_no_phrase_1000_cbow_cut100.bin"
@@ -118,3 +120,118 @@ def test_top_keyterms(word_list, word2vec_model, filteredKeyterms, k):
     sortedKeytermTuples = sorted(filteredKeytermTuples, key=lambda x: x[1], reverse=True)
 
     return sortedKeytermTuples[:k]
+
+
+def test_clustering():
+    from sklearn import cluster
+
+    adv_keyterms = load_adv_keyterms_from_file("dataset/top10-keywords-ecommerce-filtered.txt")
+    word2vec_model = load_embedding_model(binary=True)
+
+    X_vec = np.ndarray(shape=(len(adv_keyterms), 200))
+    for idx in range(len(adv_keyterms)):
+        kt = adv_keyterms[idx]
+        v = [word2vec_model[word] for word in kt]
+        X_vec[idx] = matutils.unitvec(np.array(v).mean(axis=0))
+
+    X = []
+    for kt1 in adv_keyterms:
+        line = []
+        for kt2 in adv_keyterms:
+            sim = word2vec_model.n_similarity(kt1, kt2)
+            line.append(sim)
+
+        X.append(line)
+
+
+
+    print "Start Affinity Propagation ..."
+    af = cluster.AffinityPropagation(affinity="precomputed", damping=0.75)
+    af.fit(X)
+    print "Finished affinity propagation"
+
+    print "Start KMeans with 75 clusters"
+    km = cluster.KMeans(n_clusters=75)
+    km.fit(X_vec)
+    print "Finish Kmeans"
+
+    af_cluster_indices = af.cluster_centers_indices_
+    af_labels = af.labels_
+    n_clusters_ = len(af_cluster_indices)
+
+    km_labels = km.labels_
+
+    print "######## Affinity Propagation results ########"
+    for idx in range(n_clusters_):
+        enumerated_labels = enumerate(af_labels)
+        class_members = af_labels == idx
+        class_member_indices = [i for i, j in enumerated_labels if j == idx]
+
+        print "Cluster with label: " + str(idx)
+        print "==========================="
+        # print class_members
+        # print class_member_indices
+        print [adv_keyterms[i] for i in class_member_indices]
+        print ""
+
+    print "######## KMeans results ########"
+    for idx in range(n_clusters_):
+        enumerated_labels = enumerate(km_labels)
+        class_member_indices = [i for i, j in enumerated_labels if j == idx]
+
+        print "Cluster with label: " + str(idx)
+        print "==========================="
+        # print class_members
+        # print class_member_indices
+        print [adv_keyterms[i] for i in class_member_indices]
+        print ""
+
+
+def cluster_top_adv_keyterms():
+    from sklearn import cluster
+    adv_keyterms = load_adv_keyterms_from_file("dataset/top10-keywords-ecommerce-filtered.txt")
+    word2vec_model = load_embedding_model(binary=True)
+
+    X = []
+    for kt1 in adv_keyterms:
+        line = []
+        for kt2 in adv_keyterms:
+            sim = word2vec_model.n_similarity(kt1, kt2)
+            line.append(sim)
+
+        X.append(line)
+
+    print "Start Affinity Propagation ..."
+    af = cluster.AffinityPropagation(affinity="precomputed", damping=0.5)
+    af.fit(X)
+    print "Finished affinity propagation"
+
+    af_cluster_indices = af.cluster_centers_indices_
+    af_labels = af.labels_
+    n_clusters = len(af_cluster_indices)
+
+    clusters = []
+
+    for i in range(n_clusters):
+        cluster_center_1 = adv_keyterms[af_cluster_indices[i]]
+
+        ## compute cluster composition
+        cluster_data = {
+            "center": cluster_center_1
+        }
+
+        cluster_members = []
+        for ktIdx in range(len(af_labels)):
+            if af_labels[ktIdx] == i:
+                cluster_members.append(adv_keyterms[ktIdx])
+
+        cluster_data[i] = {
+            "members": cluster_members,
+            "len": len(cluster_members)
+        }
+
+        clusters.append(cluster_data)
+
+    with open("dataset/keyterm_clustering/top_adv_keyterm_clusters.dump", "w") as fp:
+        np.save(fp, clusters)
+        print "Saved top adv keyterm clusters"

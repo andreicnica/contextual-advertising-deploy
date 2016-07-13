@@ -284,7 +284,7 @@ def train_relevance_classifier(train_dataset_file, test_dataset_file, model_outp
     cl.model.save(model_output_file)
 
 """
-create_candidate_term_dataset("dataset/scraped_pages_dataset.json", "dataset/candidate_keyterms_dataset_general.json")
-create_term_features_dataset("dataset/scraped_pages_dataset.json", "dataset/candidate_keyterms_dataset_general.json", "dataset/keyterms_features_train_general.json", "dataset/keyterms_features_test_general.json")
+create_candidate_term_dataset("dataset/scraped_pages_dataset.json", "dataset/candidate_keyterms_generation_dataset.json")
+create_term_features_dataset("dataset/scraped_pages_dataset.json", "dataset/candidate_keyterms_generation_dataset.json", "dataset/keyterms_features_train_general.json", "dataset/keyterms_features_test_general.json")
 train_relevance_classifier("dataset/keyterm_features_train_general.json", "dataset/keyterm_features_test_general.json", "dataset/keyterm-classifier-model-general.pickle")
 """
