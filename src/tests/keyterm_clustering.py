@@ -347,6 +347,8 @@ def compute_suggested_adv_cluster_dataset(relative_dataset_filename):
     writer = pd.ExcelWriter("dataset/keyterm_clustering/"+ relative_dataset_filename + "_adv_matched" + ".xlsx")
     df_matching.to_excel(writer, "adv_matching")
 
+    writer.save()
+
     return df_matching
 
 # if __name__ == "__main__":
