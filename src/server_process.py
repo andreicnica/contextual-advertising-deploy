@@ -224,7 +224,7 @@ class KeytermServerExtractor(object):
 
 
 
-    def extractTermsFromText(self, link):
+    def extractTermsFromText(self, text):
         default_return = {
             "available_domains": ["http://www.generation-nt.com/", "http://www.maison.com/",
                                   "http://www.journaldugeek.com/", "http://www.journaldugamer.com/",
@@ -246,7 +246,7 @@ class KeytermServerExtractor(object):
             keyterms = self.filter_candidates_from_snippet(candidate_keyterms)
 
             default_return["keyTerms"] = keyterms
-            
+
             return default_return
 
         except:
