@@ -20,6 +20,7 @@ from website_data_extractor import WebsiteDataExtractor
 from keyterm_extractor import KeyTermExtractor2
 from keyterm_features import KeyTermFeatures2
 from relevance_filter import RelevanceFilter
+from keyterm_classification import KeytermClassification
 
 import utils.functions as utils
 import urlparse, json, pprint
@@ -48,12 +49,14 @@ def makeServerHandlerClass(keytermExtractor):
 
         def do_GET(self):
             print self.path
+
             if self.path.startswith("/sien-poc"):
                 parsed_qs = urlparse.parse_qs(urlparse.urlparse(self.path).query)
                 link = parsed_qs.get('link', None)
                 text = parsed_qs.get('text', None)
+                linkRecommend = parsed_qs.get("recommend", None)
 
-                terms = self.extractFromLinkOrText(link, text)
+                terms = self.extractFromLinkOrText(link, text, linkRecommend)
                 self._set_headers()
                 self.wfile.write(json.dumps(terms))
             else:
@@ -71,8 +74,9 @@ def makeServerHandlerClass(keytermExtractor):
                 post_body = self.rfile.read(content_len)
                 link = urlparse.parse_qs(post_body).get('link', None)
                 text = urlparse.parse_qs(post_body).get('text', None)
+                linkRecommend = urlparse.parse_qs(post_body).get('recommend', None)
 
-                terms = self.extractFromLinkOrText(link, text)
+                terms = self.extractFromLinkOrText(link, text, linkRecommend)
                 self._set_headers()
                 self.wfile.write(json.dumps(terms))
             else:
@@ -80,7 +84,7 @@ def makeServerHandlerClass(keytermExtractor):
                 self.wfile.write("")
 
 
-        def extractFromLinkOrText(self, link, text):
+        def extractFromLinkOrText(self, link, text, linkRecommend):
             terms = []
             if not link is None:
                 # return JSON response with terms extracted from the link
@@ -89,6 +93,10 @@ def makeServerHandlerClass(keytermExtractor):
             elif not text is None:
                 # return JSON response with terms extracted from text snippet
                 terms = self.keytermExtractor.extractTermsFromText(text[0])
+
+            elif not linkRecommend is None:
+                # return JSON response with recommandations using base
+                terms = self.keytermExtractor.recommendKeytermsForBase(linkRecommend[0])
 
             return terms
 
@@ -137,6 +145,9 @@ class KeytermServerExtractor(object):
         #self.relevance_filter = RelevanceFilter("dataset/keyterm-classifier-model-v3.pickle", topk = self.topk)
         #self.relevance_filter = RelevanceFilter("dataset/keyterm-classifier-model-updated.pickle", topk = self.topk)
         self.relevance_filter = RelevanceFilter("dataset/keyterm-classifier-model-general.pickle", topk = self.topk)
+        self.keytermClassifier = KeytermClassification(
+            classesFile="dataset/top10-keywords-ecommerce-filtered.txt",
+            classesClusterPath="dataset/keyterm_clustering/top_adv_keyterm_clusters.dump")
 
     def _cleanup(self):
         self.tagger = None
@@ -213,7 +224,7 @@ class KeytermServerExtractor(object):
 
 
 
-    def extractTermsFromText(self, text):
+    def extractTermsFromText(self, link):
         default_return = {
             "available_domains": ["http://www.generation-nt.com/", "http://www.maison.com/",
                                   "http://www.journaldugeek.com/", "http://www.journaldugamer.com/",
@@ -228,19 +239,87 @@ class KeytermServerExtractor(object):
                                   "http://portail.free.fr/", "http://www.planet.fr/",
                                   "http://aliceadsl.closermag.fr/", "http://aliceadsl.lemonde.fr/",
                                   "http://aliceadsl.gqmagazine.fr/"],
-            "defaultPath": False, "dataIntegrity": False, "keyTerms": []}
-
-
+            "defaultPath": False, "dataIntegrity":False, "keyTerms":[]}
 
         try:
-            candidate_keyterms = self.candidate_extractor.execute_with_snippet(text)
-            keyterms = self.filter_candidates_from_snippet(candidate_keyterms)
+            ## 1) Extract webpage data
+            print "[INFO] ==== Extracting webpage data ===="
+            data_dict = self.data_scraper.crawlPage(link)
 
-            default_return["keyTerms"] = keyterms
+            default_return["defaultPath"] = data_dict["defaultPath"]
+            default_return["dataIntegrity"] = data_dict["dataIntegrity"]
+
+            if data_dict["defaultPath"] or not data_dict["dataIntegrity"]:
+                return default_return
+
+            #pprint.pprint(data_dict)
+            ## 2) Extract candidate keyterms
+            print "[INFO] ==== Extracting candidate keyterms ===="
+            self.candidate_extractor.execute(data_dict)
+
+            # print keyterm_extractor.result_dict
+            ## 3) Compute candidate keyterm features
+            print "[INFO] ==== Computing candidate keyterm features ===="
+            candidate_keyterm_df = self.feature_extractor.compute_features(link, data_dict, self.candidate_extractor.candidates)
+
+
+            ## 4) Filter for relevancy and output top 10 keyterms
+            print "[INFO] ==== Selecting relevant keyterms ===="
+            selected_keyterms = self.relevance_filter.select_relevant(candidate_keyterm_df, self.candidate_extractor.candidates)
+
+            # print "[INFO] ==== FINAL SELECTION ====="
+            default_return["keyTerms"] = selected_keyterms
             return default_return
-        except:
 
-            logging.getLogger().exception("Error in keyterm extraction from text!")
+        except:
+            return default_return
+
+    def recommendKeytermsForBase(self, link):
+        default_return = {
+            "link_baseline_text": ["title", "description", "keywords", "urlTokens"],
+            "keyTerms_recommandations": []}
+
+        try:
+            ## 1) Extract webpage data
+            print "[INFO] ==== Extracting webpage data USING Specific PathDef===="
+            data_dict = self.data_scraper.crawlPage(link, elementsPathDef="baseCluster")
+
+            #Check integrity of list
+            if len(data_dict) <= 0:
+                return default_return
+
+            # #TEST
+            # default_return["crawled_data"] = data_dict
+
+            #Simple extraction of possible terms (not using trained model)
+            #Concatanate into text all components with sentence separation
+            text_for_analysis = u''
+            for key, value in data_dict.iteritems():
+                if isinstance(value, basestring):
+                    text_for_analysis = text_for_analysis + ". " + value + ". "
+                elif isinstance(value, list):
+                    text_for_analysis = text_for_analysis + ". ".join(value)
+
+            # #TEST
+            # default_return["text_for_analysis"] = text_for_analysis
+
+            #pprint.pprint(data_dict)
+            ## 2) Extract candidate keyterms
+            print "[INFO] ==== Extracting candidate keyterms ===="
+            candidates = self.candidate_extractor.execute_with_snippet(text_for_analysis)
+
+            #TEST
+            default_return["keyTerms_candidates"] = candidates
+
+            ## 3) Compute keyterm recommendations comparing cluster centroids
+            print "[INFO] ==== Computing keyterm recommendations ===="
+            keyterm_recommendations = self.keytermClassifier.match_adv_keyterm_clusters_base(candidates)
+
+            # print "[INFO] ==== FINAL SELECTION ====="
+            default_return["keyTerms_recommandations"] = keyterm_recommendations
+            return default_return
+
+        except:
             return default_return
 
 

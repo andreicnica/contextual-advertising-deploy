@@ -1,4 +1,5 @@
 #from graphlab.cython.context import debug_trace
+from itertools import chain
 
 __author__ = 'andrei'
 
@@ -25,6 +26,7 @@ class WebsiteDataExtractor(object):
 
     parser = etree.HTMLParser()
     defaultPaths = {}
+    baseClusterPaths = {}
     customPaths = {}
 
     def __init__(self, definitionsFile):
@@ -36,6 +38,9 @@ class WebsiteDataExtractor(object):
             if child.tag == "default":
                 for elemPath in child:
                     self.defaultPaths[elemPath.tag] = elemPath.text
+            elif child.tag == "baseCluster":
+                for elemPath in child:
+                    self.baseClusterPaths[elemPath.tag] = elemPath.text
             else:
                 domain = ""
                 parsers = {}
@@ -118,7 +123,7 @@ class WebsiteDataExtractor(object):
             return tokens
 
 
-    def crawlPage(self, page):
+    def crawlPage(self, page, elementsPathDef=None):
         try:
             req = urllib.urlopen(page)
         except urllib.HTTPError, e:
@@ -132,7 +137,10 @@ class WebsiteDataExtractor(object):
 
         #print "ENCODING::" + req.headers.getparam("charset")
 
-        (paths, defaultPath) = self.getElementPaths(page)
+        if elementsPathDef == "baseCluster":
+            (paths, defaultPath) = (self.baseClusterPaths, False)
+        else:
+            (paths, defaultPath) = self.getElementPaths(page)
 
         pageData = {"urlTokens" : self.tokenizeWebsiteUrl(page), "defaultPath":defaultPath}
         for el, elPattern in paths.iteritems():
@@ -199,6 +207,6 @@ class WebsiteDataExtractor(object):
 
 
 
-test = WebsiteDataExtractor("dataset/WebsiteElementsPathDef.xml")
-d = test.crawlPage("http://www.generation-nt.com/huawei-p9-waterproof-etanche-teasers-photos-actualite-1926204.html")
+# test = WebsiteDataExtractor("dataset/WebsiteElementsPathDef.xml")
+# d = test.crawlPage("http://www.generation-nt.com/huawei-p9-waterproof-etanche-teasers-photos-actualite-1926204.html")
 

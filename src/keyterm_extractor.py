@@ -232,6 +232,7 @@ class KeyTermExtractor2(object):
             text = unicode(text, "utf-8")
 
         sentence_list = self.sentence_tokenizer.tokenize(text.strip())
+
         for s in sentence_list:
             # check that the sentence is not empty
             if s:
