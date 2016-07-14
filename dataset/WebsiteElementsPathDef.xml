@@ -6,6 +6,11 @@
         <description>//*[@class="description"]|//meta[@name="description"]//@content|//meta[@property="og:description"]//@content</description>
         <siteKeywords>/html/head/meta[@name="keywords"]/@content</siteKeywords>
     </default>
+    <baseCluster>
+        <title>/html/head/title//text()</title>
+        <description>//*[@class="description"]|//meta[@name="description"]//@content|//meta[@property="og:description"]//@content</description>
+        <keywords>/html/head/meta[@name="keywords"]/@content</keywords>
+    </baseCluster>
     <website>
         <domain>http://www.generation-nt.com/</domain>
         <title>/html/head/title//text()</title>

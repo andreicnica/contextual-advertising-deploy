@@ -8,6 +8,7 @@ from utils.functions import extract_tagger_info
 from difflib import SequenceMatcher
 import numpy as np
 import collections
+from tests.keyterm_clustering import *
 
 # EMBEDDING_MODEL_DIR = "dataset/word2vec/french"
 #VECTOR_EMBEDDING_MODEL_FILE = EMBEDDING_MODEL_DIR + "/" + "frWiki_no_lem_no_postag_no_phrase_1000_cbow_cut100.bin"
@@ -27,13 +28,23 @@ class KeytermClassification(object):
     classes_filtered_keywords = []
 
     def __init__(self, classes=None, classesFile=None,
+                 classesClusterPath=None,
                  modelPath="dataset/frWac_non_lem_no_postag_no_phrase_200_cbow_cut100.bin", modelBinary=True):
 
         if not(classes) and not(classesFile):
-            print ""
+            print "ERROR MUST LOAD CLASS FILE"
+            return 202
 
         if not(classes):
             classes = self.load_adv_keyterms_from_file(classesFile)
+
+        #load cluster
+        if not(classesClusterPath):
+            self.classesClusters = load_cluster_dataset(classesClusterPath)
+        else:
+            #process cluster from classes
+            #TODO
+            self.classesClusters = None
 
         self.model = gensim.models.Word2Vec.load_word2vec_format(modelPath, binary=modelBinary)
         self._preProcessClasses(classes)
@@ -158,8 +169,13 @@ class KeytermClassification(object):
 
         site_classes = site_classes.values()
         for d in site_classes:
-            d["score"] = sum(np.array(d["cvalues"], dtype=float) * np.array(d["similarity"], dtype=float))
+            d["score"] = sum(np.array(d["cvalues"], dtype=float) * np.array(d["d"], dtype=float))
 
         site_classes.sort(key=lambda x: x["score"])
         site_classes = np.array(site_classes)[::-1]
         return (orig_list, site_classes)
+
+
+    def match_adv_keyterm_clusters_base(self, list_of_terms,
+                                  min_similarity_threshold=0.0, min_diff_distance=0.90, top=5):
+        return []
