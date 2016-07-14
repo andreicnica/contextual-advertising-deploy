@@ -108,25 +108,23 @@ def process_keyterm_clusters(keyterm_candidate_file_trunc):
                 cluster_center_1 = retained[af_cluster_indices[i]]
 
                 ## compute cluster composition
-                cluster_data = {
-                    "center" : cluster_center_1
-                }
-
                 cluster_members = []
                 for ktIdx in range(len(af_labels)):
                     if af_labels[ktIdx] == i:
                         cluster_members.append(retained[ktIdx])
 
-                cluster_data[i] = {
+                cluster_data = {
+                    "idx" : i,
+                    "center": cluster_center_1,
                     "members": cluster_members,
                     "len": len(cluster_members)
                 }
 
                 clusters.append(cluster_data)
 
-                min_cluster_len = set_min(min_cluster_len, cluster_data[i]["len"])
-                max_cluster_len = set_max(max_cluster_len, cluster_data[i]["len"])
-                avg_cluster_len += cluster_data[i]["len"]
+                min_cluster_len = set_min(min_cluster_len, cluster_data["len"])
+                max_cluster_len = set_max(max_cluster_len, cluster_data["len"])
+                avg_cluster_len += cluster_data["len"]
 
                 ## compute cluster distances
                 for j in range(i + 1, len(af_cluster_indices)):
@@ -141,25 +139,23 @@ def process_keyterm_clusters(keyterm_candidate_file_trunc):
 
             ## compute cluster composition for last cluster
             cluster_center_final = retained[af_cluster_indices[-1]]
-            cluster_data = {
-                "center": cluster_center_final
-            }
-
             cluster_members = []
             for ktIdx in range(len(af_labels)):
                 if af_labels[ktIdx] == len(af_cluster_indices) - 1:
                     cluster_members.append(retained[ktIdx])
 
-            cluster_data[i] = {
+            cluster_data = {
+                "idx" : len(af_cluster_indices) - 1,
+                'center': cluster_center_final,
                 "members": cluster_members,
                 "len": len(cluster_members)
             }
 
             clusters.append(cluster_data)
 
-            min_cluster_len = set_min(min_cluster_len, cluster_data[i]["len"])
-            max_cluster_len = set_max(max_cluster_len, cluster_data[i]["len"])
-            avg_cluster_len += cluster_data[i]["len"]
+            min_cluster_len = set_min(min_cluster_len, cluster_data["len"])
+            max_cluster_len = set_max(max_cluster_len, cluster_data["len"])
+            avg_cluster_len += cluster_data["len"]
 
 
             ## finalize avereges
@@ -295,12 +291,14 @@ def compute_suggested_adv_cluster_dataset(relative_dataset_filename):
     top_adv_clusters_filepath = "dataset/keyterm_clustering/top_adv_keyterm_clusters.dump"
 
     ## load dataset and embedding model
+    print "Loading Embedding model ..."
     embedding_model = load_embedding_model(True)
     vocabulary = embedding_model.vocab
 
     df = None
     top_adv_clusters = None
 
+    print "Loading datasets ..."
     with open(top_adv_clusters_filepath) as fp:
         top_adv_clusters = np.load(fp)
 
@@ -311,22 +309,45 @@ def compute_suggested_adv_cluster_dataset(relative_dataset_filename):
     ## compute
     result_dataset = []
 
+    print "Starting computation ..."
     for index, row in df.iterrows():
         url = row['url']
+        print "Processing clusters for URL: " + url + " ..."
+
         clusters = row['clusters']
-
-        for cl in clusters:
-            if cl['len'] >= 5:
-                cl_center = cl['center']
-
+        for cl_data in clusters:
+            if cl_data['len'] >= 5:
                 similarities = []
 
-                for adv_cl in top_adv_clusters:
-                    adv_center = adv_cl['center']
-                    sim = embedding_model.n_similarity(cl_center, adv_center)
+                for adv_cl_data in top_adv_clusters:
+                    sim = embedding_model.n_similarity(cl_data['center'], adv_cl_data['center'])
 
-                    similarities
+                    similarities.append((adv_cl_data['idx'], adv_cl_data['center'], sim))
 
+                similarities.sort(key=lambda x: x[2], reverse=True)
+                top3 = similarities[:3]
+
+                result_dataset.append({
+                    'url': url,
+                    'cl_idx': cl_data['idx'],
+                    'cl_center': cl_data['center'],
+                    'cl_len': cl_data['len'],
+                    'adv1_idx': top3[0][0],
+                    'adv1_center': top3[0][1],
+                    'adv1_sim': top3[0][2],
+                    'adv2_idx': top3[1][0],
+                    'adv2_center': top3[1][1],
+                    'adv2_sim': top3[1][2],
+                    'adv3_idx': top3[2][0],
+                    'adv3_center': top3[2][1],
+                    'adv3_sim': top3[2][2],
+                })
+
+    df_matching = pd.DataFrame.from_records(result_dataset)
+    writer = pd.ExcelWriter("dataset/keyterm_clustering/"+ relative_dataset_filename + "_adv_matched" + ".xlsx")
+    df_matching.to_excel(writer, "adv_matching")
+
+    return df_matching
 
 # if __name__ == "__main__":
 #     process_keyterm_clusters(GENERATION_NT_CANDIDATES)

@@ -216,16 +216,14 @@ def cluster_top_adv_keyterms():
         cluster_center_1 = adv_keyterms[af_cluster_indices[i]]
 
         ## compute cluster composition
-        cluster_data = {
-            "center": cluster_center_1
-        }
-
         cluster_members = []
         for ktIdx in range(len(af_labels)):
             if af_labels[ktIdx] == i:
                 cluster_members.append(adv_keyterms[ktIdx])
 
-        cluster_data[i] = {
+        cluster_data = {
+            "idx" : i,
+            "center": cluster_center_1,
             "members": cluster_members,
             "len": len(cluster_members)
         }
