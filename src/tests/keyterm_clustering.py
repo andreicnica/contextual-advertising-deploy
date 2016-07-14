@@ -277,7 +277,7 @@ def compare_keyterm_clusters():
     # ax = df.boxplot(column=['min_dist', 'max_dist', 'avg_dist'], return_type = 'axes')
 
 def load_cluster_dataset(file_path):
-    with open(top_adv_clusters_filepath) as fp:
+    with open(file_path) as fp:
         top_adv_clusters = np.load(fp)
     return top_adv_clusters
 
