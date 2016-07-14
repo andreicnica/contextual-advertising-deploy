@@ -239,36 +239,14 @@ class KeytermServerExtractor(object):
                                   "http://portail.free.fr/", "http://www.planet.fr/",
                                   "http://aliceadsl.closermag.fr/", "http://aliceadsl.lemonde.fr/",
                                   "http://aliceadsl.gqmagazine.fr/"],
-            "defaultPath": False, "dataIntegrity":False, "keyTerms":[]}
+            "defaultPath": False, "dataIntegrity": False, "keyTerms": []}
 
         try:
-            ## 1) Extract webpage data
-            print "[INFO] ==== Extracting webpage data ===="
-            data_dict = self.data_scraper.crawlPage(link)
+            candidate_keyterms = self.candidate_extractor.execute_with_snippet(text)
+            keyterms = self.filter_candidates_from_snippet(candidate_keyterms)
 
-            default_return["defaultPath"] = data_dict["defaultPath"]
-            default_return["dataIntegrity"] = data_dict["dataIntegrity"]
-
-            if data_dict["defaultPath"] or not data_dict["dataIntegrity"]:
-                return default_return
-
-            #pprint.pprint(data_dict)
-            ## 2) Extract candidate keyterms
-            print "[INFO] ==== Extracting candidate keyterms ===="
-            self.candidate_extractor.execute(data_dict)
-
-            # print keyterm_extractor.result_dict
-            ## 3) Compute candidate keyterm features
-            print "[INFO] ==== Computing candidate keyterm features ===="
-            candidate_keyterm_df = self.feature_extractor.compute_features(link, data_dict, self.candidate_extractor.candidates)
-
-
-            ## 4) Filter for relevancy and output top 10 keyterms
-            print "[INFO] ==== Selecting relevant keyterms ===="
-            selected_keyterms = self.relevance_filter.select_relevant(candidate_keyterm_df, self.candidate_extractor.candidates)
-
-            # print "[INFO] ==== FINAL SELECTION ====="
-            default_return["keyTerms"] = selected_keyterms
+            default_return["keyTerms"] = keyterms
+            
             return default_return
 
         except:
