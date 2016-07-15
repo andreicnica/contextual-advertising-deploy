@@ -281,7 +281,93 @@ def load_cluster_dataset(file_path):
         top_adv_clusters = np.load(fp)
     return top_adv_clusters
 
-def compute_suggested_adv_cluster_dataset(relative_dataset_filename):
+
+def suggest_top_adv_keyterms(keyterm_cluster, top_adv_clusters, embedding_model, min_sim_threshold = 0.7):
+    '''
+    Function that returns the set of top advertisment keywords that exceed the minimum similarity threshold when
+    compared with the cluster center of a keyterm cluster.
+    :rtype: List of tuples where each tuple consists of: (index of selected top advertiser cluster, cluster center, list of (member, sim) tuples from that cluster)
+    :param keyterm_cluster: Keyterm cluster in the dictionary form used in the :func:`~keyterm_clustering.process_keyterm_clusters` function
+    :param top_adv_clusters: List of clusters formed from the top advertiser keyterms
+    :param embedding_model: Word embedding model used to compute similarities
+    :param min_sim_threshold: Minimum similarity threshold between keyterm cluster center and top advertiser keyterm cluster center, as well as to
+            individual member keyterms from the cluster
+    :return: a list of tuples where each tuple consists of: (index of selected top advertiser cluster, cluster center, list of (member, sim) tuples from that cluster)
+    '''
+
+    suggested_keyterms = []
+
+    candidate_clusters = []
+    for adv_cl_data in top_adv_clusters:
+        sim = embedding_model.n_similarity(keyterm_cluster['center'], adv_cl_data['center'])
+        if sim >= min_sim_threshold:
+            candidate_clusters.append((adv_cl_data, sim))
+
+    candidate_clusters.sort(key=lambda x: x[1], reverse=True)
+
+    for adv_cl_data, sim in candidate_clusters:
+        selected_members = []
+        for keyterm in adv_cl_data['members']:
+            sim = embedding_model.n_similarity(keyterm_cluster['center'], keyterm)
+            if sim >= min_sim_threshold:
+                selected_members.append((keyterm, sim))
+
+        suggested_keyterms.append((adv_cl_data['idx'], adv_cl_data['center'], selected_members))
+
+    return suggested_keyterms
+
+
+def compute_suggested_adv_keyterms_dataset(relative_dataset_filename, min_members_per_cluster = 5):
+    filepath = "dataset/keyterm_clustering/" + relative_dataset_filename + ".json"
+    top_adv_clusters_filepath = "dataset/keyterm_clustering/top_adv_keyterm_clusters.dump"
+
+    ## load dataset and embedding model
+    print "Loading Embedding model ..."
+    embedding_model = load_embedding_model(True)
+    vocabulary = embedding_model.vocab
+
+    df = None
+    top_adv_clusters = None
+
+    print "Loading datasets ..."
+    with open(top_adv_clusters_filepath) as fp:
+        top_adv_clusters = np.load(fp)
+
+    with open(filepath) as fp:
+        df = pd.read_json(fp)
+
+    ## compute
+    result_dataset = []
+
+    print "Starting computation ..."
+    for index, row in df.iterrows():
+        url = row['url']
+        print "Processing clusters for URL: " + url + " ..."
+
+        clusters = row['clusters']
+        for cl_data in clusters:
+            if cl_data['len'] >= min_members_per_cluster:
+                suggested_keyterms = suggest_top_adv_keyterms(cl_data, top_adv_clusters, embedding_model)
+                entry = {
+                    'url': url,
+                    'cl_idx': cl_data['idx'],
+                    'cl_center': cl_data['center'],
+                    'cl_len': cl_data['len'],
+                    'suggested_keyterms': suggested_keyterms
+                }
+
+                result_dataset.append(entry)
+
+    df_matching = pd.DataFrame.from_records(result_dataset)
+    writer = pd.ExcelWriter("dataset/keyterm_clustering/" + relative_dataset_filename + "_suggested_adv" + ".xlsx")
+
+    df_matching.to_excel(writer, "adv_matching")
+    writer.save()
+
+    return df_matching
+
+
+def compute_suggested_adv_cluster_dataset(relative_dataset_filename, min_members_per_cluster = 5):
     '''
     This function takes each URI entry from the dataset file, selects only the clusters that have more than 5 elements
     and computes the top 3 most suggested adv keyterm clusters, along with the similarity value
@@ -290,7 +376,6 @@ def compute_suggested_adv_cluster_dataset(relative_dataset_filename):
      dataset/keyterm_clustering folder
     :return:
     '''
-
     filepath = "dataset/keyterm_clustering/" + relative_dataset_filename + ".json"
     top_adv_clusters_filepath = "dataset/keyterm_clustering/top_adv_keyterm_clusters.dump"
 
@@ -320,7 +405,7 @@ def compute_suggested_adv_cluster_dataset(relative_dataset_filename):
 
         clusters = row['clusters']
         for cl_data in clusters:
-            if cl_data['len'] >= 5:
+            if cl_data['len'] >= min_members_per_cluster:
                 similarities = []
 
                 for adv_cl_data in top_adv_clusters:
@@ -349,8 +434,8 @@ def compute_suggested_adv_cluster_dataset(relative_dataset_filename):
 
     df_matching = pd.DataFrame.from_records(result_dataset)
     writer = pd.ExcelWriter("dataset/keyterm_clustering/"+ relative_dataset_filename + "_adv_matched" + ".xlsx")
-    df_matching.to_excel(writer, "adv_matching")
 
+    df_matching.to_excel(writer, "adv_matching")
     writer.save()
 
     return df_matching
