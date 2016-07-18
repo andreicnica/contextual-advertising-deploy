@@ -294,7 +294,7 @@ class KeytermServerExtractor(object):
             keyterm_recommendations = self.keytermClassifier.match_adv_keyterm_clusters_base(candidates)
 
             # print "[INFO] ==== FINAL SELECTION ====="
-            default_return["keyTerms_recommandations"] = keyterm_recommendations
+            default_return["keyTerms_recommandations"] =  keyterm_recommendations
             return default_return
 
         except:
