@@ -201,8 +201,11 @@ def cluster_top_adv_keyterms():
 
         X.append(line)
 
+    # preference = [np.amin(X)] * len(adv_keyterms)
+    preference = [np.median(X)] * len(adv_keyterms)
+
     print "Start Affinity Propagation ..."
-    af = cluster.AffinityPropagation(affinity="precomputed", damping=0.5)
+    af = cluster.AffinityPropagation(affinity="precomputed", damping=0.5, preference = preference)
     af.fit(X)
     print "Finished affinity propagation"
 
@@ -233,3 +236,5 @@ def cluster_top_adv_keyterms():
     with open("dataset/keyterm_clustering/top_adv_keyterm_clusters.dump", "w") as fp:
         np.save(fp, clusters)
         print "Saved top adv keyterm clusters"
+
+    return clusters
