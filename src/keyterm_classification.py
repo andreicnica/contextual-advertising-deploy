@@ -4,6 +4,8 @@ from gensim.models import Word2Vec
 import json
 import pandas as pd
 import treetaggerwrapper as ttw
+
+from tests import keyterm_clustering
 from utils.functions import extract_tagger_info
 from difflib import SequenceMatcher
 import numpy as np
@@ -26,6 +28,7 @@ class KeytermClassification(object):
     tagger = ttw.TreeTagger(TAGLANG="fr", TAGDIR=TREETAGGER_DIR)
     classes_filtered = {}
     classes_filtered_keywords = []
+    classesClusters = None
 
     def __init__(self, classes=None, classesFile=None,
                  classesClusterPath=None,
@@ -39,7 +42,7 @@ class KeytermClassification(object):
             classes = self.load_adv_keyterms_from_file(classesFile)
 
         #load cluster
-        if not(classesClusterPath):
+        if classesClusterPath:
             self.classesClusters = load_cluster_dataset(classesClusterPath)
         else:
             #process cluster from classes
@@ -146,6 +149,7 @@ class KeytermClassification(object):
 
         for d in list_of_terms:
             d = d.copy()
+
             d["adv_keyterms"] = self.match_adv_keyterm(d["term"],
                                                   min_similarity_threshold=min_similarity_threshold,
                                                   min_diff_distance=min_diff_distance, top=top)
@@ -168,14 +172,54 @@ class KeytermClassification(object):
             orig_list.append(d)
 
         site_classes = site_classes.values()
+
         for d in site_classes:
-            d["score"] = sum(np.array(d["cvalues"], dtype=float) * np.array(d["d"], dtype=float))
+            d["score"] = sum(np.array(d["cvalues"], dtype=float) * np.array(d["similarity"], dtype=float))
+
 
         site_classes.sort(key=lambda x: x["score"])
         site_classes = np.array(site_classes)[::-1]
         return (orig_list, site_classes)
 
-
     def match_adv_keyterm_clusters_base(self, list_of_terms,
-                                  min_similarity_threshold=0.0, min_diff_distance=0.90, top=5):
-        return []
+                                  min_similarity_threshold=0.5):
+        '''
+        This function takes a list of keyterms and makes recommendations based on clustering the terms from the source
+        and target candidates
+        :param
+        keyterms : list of keyterms in dictionary format. They contain the following details: lemma_string, pos, len,
+        cvalue, words, tf, lemma_list
+        :return:
+        keyterm recommandations
+        '''
+        orig_list = []
+        reverse_list = {}
+
+        keyterms_clustered = keyterm_clustering.cluster_keyterms(list_of_terms, self.model)
+
+        for k_cluster in keyterms_clustered:
+            cluster_recom = keyterm_clustering.suggest_top_adv_keyterms(k_cluster, self.classesClusters,
+                                                            self.model, min_sim_threshold=min_similarity_threshold)
+
+            if len(cluster_recom) > 0:
+                center_name = u" ".join(k_cluster["center"])
+                r = []
+                #format cluster recommandations
+                for (_ , _ , recom) in cluster_recom:
+                    for (termList, sim) in recom:
+                        r.append({"term": u" ".join(termList), "similarity": sim})
+
+                    orig_list.append({"keyterm": center_name, "adv_keyterms": r})
+
+        for recommendation in orig_list:
+            print recommendation
+            for adv_term in recommendation["adv_keyterms"]:
+                if not adv_term["term"] in reverse_list:
+                    reverse_list[adv_term["term"]] = {"adv_keyterm": adv_term["term"],
+                                                      "similarity": [adv_term["similarity"]],
+                                                      "source_term" : [recommendation["keyterm"]]}
+                else:
+                    reverse_list[adv_term["term"]]["similarity"].append(adv_term["similarity"])
+                    reverse_list[adv_term["term"]]["source_term"].append(recommendation["keyterm"])
+
+        return (orig_list, reverse_list.values())

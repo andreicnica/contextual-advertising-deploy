@@ -5,9 +5,21 @@ HTTP SERVER for running keyterm extractor.
 Usage::
     ./server_process [-port <port>] [-lang <lang>]
 Send a GET request::
-    http://localhost:<port>/?link=<link>
+    For keyterm extraction from link use::
+        http://localhost:<port>/sien-poc/?link=<link>
+
+    For keyterm extraction from text use::
+        http://localhost:<port>/sien-poc/?text=<text>
+
+    For keyterm recommendations for a link using clustering method use::
+        http://localhost:<port>/sien-poc/?recommend=<link>
+
+    For keyterm recommendations for a link using basic individual keyterm extracted use::
+        http://localhost:<port>/sien-poc/?recommendSimple=<link>
+
 Send a POST request::
     curl -d "link=<link>" http://localhost:<port>
+    ....
 """
 
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
@@ -55,8 +67,9 @@ def makeServerHandlerClass(keytermExtractor):
                 link = parsed_qs.get('link', None)
                 text = parsed_qs.get('text', None)
                 linkRecommend = parsed_qs.get("recommend", None)
+                linkRecommendWithoutClustering = parsed_qs.get("recommendSimple", None)
 
-                terms = self.extractFromLinkOrText(link, text, linkRecommend)
+                terms = self.extractFromLinkOrText(link, text, linkRecommend, linkRecommendWithoutClustering)
                 self._set_headers()
                 self.wfile.write(json.dumps(terms))
             else:
@@ -75,8 +88,9 @@ def makeServerHandlerClass(keytermExtractor):
                 link = urlparse.parse_qs(post_body).get('link', None)
                 text = urlparse.parse_qs(post_body).get('text', None)
                 linkRecommend = urlparse.parse_qs(post_body).get('recommend', None)
+                linkRecommendWithoutClustering = urlparse.parse_qs(post_body).get('recommendSimple', None)
 
-                terms = self.extractFromLinkOrText(link, text, linkRecommend)
+                terms = self.extractFromLinkOrText(link, text, linkRecommend, linkRecommendWithoutClustering)
                 self._set_headers()
                 self.wfile.write(json.dumps(terms))
             else:
@@ -84,7 +98,7 @@ def makeServerHandlerClass(keytermExtractor):
                 self.wfile.write("")
 
 
-        def extractFromLinkOrText(self, link, text, linkRecommend):
+        def extractFromLinkOrText(self, link, text, linkRecommend, linkRecommendWithoutClustering):
             terms = []
             if not link is None:
                 # return JSON response with terms extracted from the link
@@ -97,6 +111,10 @@ def makeServerHandlerClass(keytermExtractor):
             elif not linkRecommend is None:
                 # return JSON response with recommandations using base
                 terms = self.keytermExtractor.recommendKeytermsForBase(linkRecommend[0])
+
+            elif not linkRecommendWithoutClustering is None:
+                # return JSON response with recommandations using base
+                terms = self.keytermExtractor.recommendKeytermsSimple(linkRecommendWithoutClustering[0])
 
             return terms
 
@@ -254,14 +272,15 @@ class KeytermServerExtractor(object):
 
     def recommendKeytermsForBase(self, link):
         default_return = {
-            "link_baseline_text": ["title", "description", "keywords", "urlTokens"],
+            "type": "Recommendations based on clustering.",
+            "text_used_from_link": ["title", "description", "keywords", "urlTokens"],
             "keyTerms_recommandations": []}
 
         try:
             ## 1) Extract webpage data
             print "[INFO] ==== Extracting webpage data USING Specific PathDef===="
-            data_dict = self.data_scraper.crawlPage(link, elementsPathDef="baseCluster")
 
+            data_dict = self.data_scraper.crawlPage(link, elementsPathDef="baseCluster")
             #Check integrity of list
             if len(data_dict) <= 0:
                 return default_return
@@ -286,15 +305,43 @@ class KeytermServerExtractor(object):
             print "[INFO] ==== Extracting candidate keyterms ===="
             candidates = self.candidate_extractor.execute_with_snippet(text_for_analysis)
 
-            #TEST
-            default_return["keyTerms_candidates"] = candidates
+            #SHOW CANDIDATES
+            # default_return["keyTerms_candidates"] = candidates
 
             ## 3) Compute keyterm recommendations comparing cluster centroids
             print "[INFO] ==== Computing keyterm recommendations ===="
-            keyterm_recommendations = self.keytermClassifier.match_adv_keyterm_clusters_base(candidates)
+            orig_list, keyterm_recommendations = self.keytermClassifier.match_adv_keyterm_clusters_base(candidates,
+                                                                                     min_similarity_threshold=0.5)
 
             # print "[INFO] ==== FINAL SELECTION ====="
             default_return["keyTerms_recommandations"] =  keyterm_recommendations
+            return default_return
+
+        except:
+            return default_return
+
+    def recommendKeytermsSimple(self, link):
+        default_return = {
+            "type": "Simple recommendation based only on individual extracted keyterms.",
+            "defaultPath": False, "dataIntegrity": False,
+            "keyTerms_recommandations": []}
+
+        try:
+            ## 1) Extract webpage data
+            print "[INFO] ==== Extracting Terms From Link ===="
+
+            keyterms = self.extracTermsFromLink(link)["keyTerms"]
+
+            if len(keyterms) <= 0:
+                return default_return
+
+            ##2) Compute keyterm recommendations comparing cluster centroids
+            print "[INFO] ==== Computing keyterm recommendations ===="
+            orig_list, keyterm_recommendations = self.keytermClassifier.match_adv_keyterm_website(keyterms,
+                                                       min_similarity_threshold=0.5, min_diff_distance=0.90, top=5)
+
+            print "[INFO] ==== FINAL SELECTION ====="
+            default_return["keyTerms_recommandations"] =  list(keyterm_recommendations)
             return default_return
 
         except:

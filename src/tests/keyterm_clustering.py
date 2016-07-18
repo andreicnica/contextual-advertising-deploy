@@ -299,6 +299,7 @@ def suggest_top_adv_keyterms(keyterm_cluster, top_adv_clusters, embedding_model,
     suggested_keyterms = []
 
     candidate_clusters = []
+
     for adv_cl_data in top_adv_clusters:
         sim = embedding_model.n_similarity(keyterm_cluster['center'], adv_cl_data['center'])
         if sim >= min_sim_threshold:
@@ -441,8 +442,84 @@ def compute_suggested_adv_cluster_dataset(relative_dataset_filename, min_members
 
     return df_matching
 
-def cluster_keyterms(keyterms):
-    return 0
+def filter_keyterms_byVocab(keyterms, vocab):
+    '''
+    Filters keyterms with only those in vocab
+    :param
+    keyterms : list of keyterms in dictionary format. They contain the following details: lemma_string, pos, len,
+    cvalue, words, tf, lemma_list
+    vocab : embedding model vocabulary
+    :return:
+    cluster of keyterms
+    '''
+    retained = []
+    print len(keyterms)
+    for key, value in keyterms.iteritems():
+        transformed_lemma = transform_keyterm_by_vocabulary(value['lemma_list'], vocab)
+
+        if transformed_lemma:
+            retained.append(transformed_lemma)
+
+    return retained
+
+def cluster_keyterms(keyterms, word2vec_model):
+    '''
+    This function takes a list of keyterms, filters out only the words that can be used in the model
+    and clusters them
+    :param
+    keyterms : list of keyterms in dictionary format. They contain the following details: lemma_string, pos, len,
+    cvalue, words, tf, lemma_list
+    word2vec_model : embedding model
+    :return:
+    cluster of keyterms
+    '''
+    from sklearn import cluster
+
+    #filter keyterms to work with the embedding model
+    filtered_keyterms = filter_keyterms_byVocab(keyterms, word2vec_model.vocab)
+    X = []
+    for kt1 in filtered_keyterms:
+        line = []
+        for kt2 in filtered_keyterms:
+            sim = word2vec_model.n_similarity(kt1, kt2)
+            line.append(sim)
+
+        X.append(line)
+
+    # preference = [np.amin(X)] * len(filtered_keyterms)
+    preference = [np.median(X)] * len(filtered_keyterms)
+
+    print "Start Affinity Propagation ..."
+    af = cluster.AffinityPropagation(affinity="precomputed", damping=0.5, preference = preference)
+    af.fit(X)
+    print "Finished affinity propagation"
+
+    af_cluster_indices = af.cluster_centers_indices_
+    af_labels = af.labels_
+    n_clusters = len(af_cluster_indices)
+
+    clusters = []
+
+    for i in range(n_clusters):
+        cluster_center_1 = filtered_keyterms[af_cluster_indices[i]]
+
+        ## compute cluster composition
+        cluster_members = []
+        for ktIdx in range(len(af_labels)):
+            if af_labels[ktIdx] == i:
+                cluster_members.append(filtered_keyterms[ktIdx])
+
+        cluster_data = {
+            "idx" : i,
+            "center": cluster_center_1,
+            "members": cluster_members,
+            "len": len(cluster_members)
+        }
+
+        clusters.append(cluster_data)
+
+    return clusters
+
 
 # if __name__ == "__main__":
 #     process_keyterm_clusters(GENERATION_NT_CANDIDATES)

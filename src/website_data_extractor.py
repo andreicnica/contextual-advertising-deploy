@@ -149,11 +149,18 @@ class WebsiteDataExtractor(object):
             if len(s) <= 0:
                 pageData[el] = []
                 continue
-
             if el in self.CONCAT_ANSWERS:
-                s = self.clean_string_full(u" ".join(s))
+                conc = u""
+                for x in s:
+                    if not(isinstance(x, etree._Element)):
+                        conc = conc + x + u" "
+                s = self.clean_string_partial(conc)
             elif el in self.CONCAT_SENTENCES:
-                s = self.clean_string_partial(u" ".join(s))
+                conc = u""
+                for x in s:
+                    if not(isinstance(x, etree._Element)):
+                        conc = conc + x + u" "
+                s = self.clean_string_partial(conc)
             elif el in self.GROUP_BY_CHILDREN:
                 ls = []
                 for aux in s:
